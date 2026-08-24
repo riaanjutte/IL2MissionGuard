@@ -46,6 +46,26 @@ void TestSettings(const fs::path& root) {
     Require(options.intervalMinutes == 7 && options.historicSnapshots == 12 && !options.trayNotifications, "settings values");
     Write(ini, "[AutoSave]\nIntervalMinutes=999\n");
     Require(il2mec::LoadAutoSaveOptions(ini) == il2mec::AutoSaveOptions{}, "invalid settings fallback");
+
+    Write(ini,
+          "[EditorDimensions]\nMissionTreeWidth=333\n\n"
+          "[KoreaOptions]\nForceViewportToSdr=true\n\n"
+          "[AutoSave]\nEnabled=true\nIntervalMinutes=5\n");
+    const il2mec::AutoSaveOptions requested{true, false, true, 17, 42, false};
+    il2mec::SaveAutoSaveOptions(ini, requested);
+    Require(il2mec::LoadAutoSaveOptions(ini) == requested, "saved autosave settings round trip");
+    const std::string updated = Read(ini);
+    Require(updated.find("MissionTreeWidth=333") != std::string::npos, "dimension section preserved");
+    Require(updated.find("ForceViewportToSdr=true") != std::string::npos, "Korea section preserved");
+
+    bool invalidRejected = false;
+    try {
+        il2mec::SaveAutoSaveOptions(ini, il2mec::AutoSaveOptions{true, false, false, 5, 10, true});
+    } catch (const std::invalid_argument&) {
+        invalidRejected = true;
+    }
+    Require(invalidRejected, "invalid saved settings rejected");
+    Require(il2mec::LoadAutoSaveOptions(ini) == requested, "invalid save left settings unchanged");
 }
 
 void TestMissionTitle(const fs::path& root) {

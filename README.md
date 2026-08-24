@@ -39,9 +39,12 @@ Right-click the tray icon to:
 
 - create a recovery point immediately;
 - restore a previous recovery point;
+- open **Settings...** to configure every autosave option;
 - open the recovery-point folder;
 - open the diagnostic log; or
 - exit Mission Guard.
+
+You can also open the same dialog directly with `IL2MissionGuard.exe --settings`. If Mission Guard is already running, the command opens Settings in the existing tray process.
 
 ## Configuration
 

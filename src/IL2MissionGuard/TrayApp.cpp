@@ -26,12 +26,14 @@ constexpr wchar_t kWindowClass[] = L"IL2MissionGuard.Window";
 constexpr wchar_t kMutexName[] = L"Local\\IL2MEC.AutoSave.Agent";
 constexpr wchar_t kStopEventName[] = L"Local\\IL2MEC.AutoSave.Stop";
 constexpr UINT kTrayCallback = WM_APP + 1;
+constexpr UINT kOpenSettingsMessage = WM_APP + 2;
 constexpr UINT kTimerId = 1;
 constexpr UINT kSaveCommandId = 0x8037;
 constexpr UINT kMenuSave = 1001;
 constexpr UINT kMenuFolder = 1002;
 constexpr UINT kMenuLog = 1003;
 constexpr UINT kMenuExit = 1004;
+constexpr UINT kMenuSettings = 1005;
 constexpr UINT kRestoreFirst = 2000;
 constexpr UINT kRestoreLast = 2199;
 
@@ -45,6 +47,106 @@ struct ProcessInfo {
     HWND window = nullptr;
     std::wstring title;
 };
+
+struct SettingsDialogState {
+    il2mec::AutoSaveOptions options;
+    fs::path settingsPath;
+    HINSTANCE instance = nullptr;
+    bool saved = false;
+};
+
+void UpdateSettingsControlState(HWND dialog) {
+    const bool enabled = IsDlgButtonChecked(dialog, IDC_AUTOSAVE_ENABLED) == BST_CHECKED;
+    for (int controlId : {IDC_GREAT_BATTLES, IDC_KOREA, IDC_INTERVAL, IDC_SNAPSHOTS, IDC_NOTIFICATIONS}) {
+        EnableWindow(GetDlgItem(dialog, controlId), enabled);
+    }
+}
+
+void CenterDialog(HWND dialog) {
+    RECT bounds{};
+    if (!GetWindowRect(dialog, &bounds)) return;
+    MONITORINFO monitor{sizeof(monitor)};
+    if (!GetMonitorInfoW(MonitorFromWindow(dialog, MONITOR_DEFAULTTONEAREST), &monitor)) return;
+    const int width = bounds.right - bounds.left;
+    const int height = bounds.bottom - bounds.top;
+    const int x = monitor.rcWork.left + (monitor.rcWork.right - monitor.rcWork.left - width) / 2;
+    const int y = monitor.rcWork.top + (monitor.rcWork.bottom - monitor.rcWork.top - height) / 2;
+    SetWindowPos(dialog, nullptr, x, y, 0, 0, SWP_NOACTIVATE | SWP_NOSIZE | SWP_NOZORDER);
+}
+
+INT_PTR CALLBACK SettingsDialogProcedure(HWND dialog, UINT message, WPARAM wParam, LPARAM lParam) {
+    auto* state = reinterpret_cast<SettingsDialogState*>(GetWindowLongPtrW(dialog, DWLP_USER));
+    if (message == WM_INITDIALOG) {
+        state = reinterpret_cast<SettingsDialogState*>(lParam);
+        SetWindowLongPtrW(dialog, DWLP_USER, reinterpret_cast<LONG_PTR>(state));
+        SendMessageW(dialog, WM_SETICON, ICON_SMALL,
+                     reinterpret_cast<LPARAM>(LoadIconW(state->instance, MAKEINTRESOURCEW(IDI_APP_ICON))));
+        CheckDlgButton(dialog, IDC_AUTOSAVE_ENABLED, state->options.enabled ? BST_CHECKED : BST_UNCHECKED);
+        CheckDlgButton(dialog, IDC_GREAT_BATTLES, state->options.greatBattles ? BST_CHECKED : BST_UNCHECKED);
+        CheckDlgButton(dialog, IDC_KOREA, state->options.korea ? BST_CHECKED : BST_UNCHECKED);
+        CheckDlgButton(dialog, IDC_NOTIFICATIONS, state->options.trayNotifications ? BST_CHECKED : BST_UNCHECKED);
+        SetDlgItemInt(dialog, IDC_INTERVAL, static_cast<UINT>(state->options.intervalMinutes), FALSE);
+        SetDlgItemInt(dialog, IDC_SNAPSHOTS, static_cast<UINT>(state->options.historicSnapshots), FALSE);
+        UpdateSettingsControlState(dialog);
+        CenterDialog(dialog);
+        return TRUE;
+    }
+    if (!state) return FALSE;
+
+    if (message == WM_CTLCOLORSTATIC && GetDlgCtrlID(reinterpret_cast<HWND>(lParam)) == IDC_NEW_MISSION_NOTE) {
+        HDC device = reinterpret_cast<HDC>(wParam);
+        SetTextColor(device, RGB(190, 130, 0));
+        SetBkMode(device, TRANSPARENT);
+        return reinterpret_cast<INT_PTR>(GetSysColorBrush(COLOR_3DFACE));
+    }
+    if (message != WM_COMMAND) return FALSE;
+
+    const WORD command = LOWORD(wParam);
+    if (command == IDC_AUTOSAVE_ENABLED && HIWORD(wParam) == BN_CLICKED) {
+        UpdateSettingsControlState(dialog);
+        return TRUE;
+    }
+    if (command == IDCANCEL) {
+        EndDialog(dialog, IDCANCEL);
+        return TRUE;
+    }
+    if (command != IDOK) return FALSE;
+
+    BOOL intervalValid = FALSE, snapshotsValid = FALSE;
+    const UINT interval = GetDlgItemInt(dialog, IDC_INTERVAL, &intervalValid, FALSE);
+    const UINT snapshots = GetDlgItemInt(dialog, IDC_SNAPSHOTS, &snapshotsValid, FALSE);
+    const bool enabled = IsDlgButtonChecked(dialog, IDC_AUTOSAVE_ENABLED) == BST_CHECKED;
+    const bool greatBattles = IsDlgButtonChecked(dialog, IDC_GREAT_BATTLES) == BST_CHECKED;
+    const bool korea = IsDlgButtonChecked(dialog, IDC_KOREA) == BST_CHECKED;
+    if (enabled && !greatBattles && !korea) {
+        MessageBoxW(dialog, L"Select Great Battles, Korea, or both before enabling autosave.",
+                    L"IL-2 Mission Guard settings", MB_OK | MB_ICONWARNING);
+        return TRUE;
+    }
+    if (!intervalValid || interval < 1 || interval > 60 ||
+        !snapshotsValid || snapshots < 1 || snapshots > 100) {
+        MessageBoxW(dialog, L"Save interval must be 1-60 minutes and recovery points must be 1-100.",
+                    L"IL-2 Mission Guard settings", MB_OK | MB_ICONWARNING);
+        return TRUE;
+    }
+
+    state->options = {
+        enabled,
+        greatBattles,
+        korea,
+        static_cast<int>(interval),
+        static_cast<int>(snapshots),
+        IsDlgButtonChecked(dialog, IDC_NOTIFICATIONS) == BST_CHECKED};
+    try {
+        il2mec::SaveAutoSaveOptions(state->settingsPath, state->options);
+        state->saved = true;
+        EndDialog(dialog, IDOK);
+    } catch (const std::exception& error) {
+        MessageBoxW(dialog, (L"The settings could not be saved.\n\n" + il2mec::Utf8ToWide(error.what())).c_str(),
+                    L"IL-2 Mission Guard settings", MB_OK | MB_ICONERROR);
+    }
+    return TRUE;
+}
 
 std::wstring GetWindowTextString(HWND window) {
     int length = GetWindowTextLengthW(window);
@@ -217,7 +319,7 @@ bool OpenMission(const fs::path& executable, const std::wstring& processName, co
 
 class TrayApp {
 public:
-    TrayApp(HINSTANCE instance, fs::path settingsPath)
+    TrayApp(HINSTANCE instance, fs::path settingsPath, bool openSettingsOnStart)
         : instance_(instance), settingsPath_(std::move(settingsPath)), options_(il2mec::LoadAutoSaveOptions(settingsPath_)),
           store_(il2mec::DefaultSnapshotRoot(), options_.historicSnapshots) {
         WNDCLASSEXW windowClass{sizeof(windowClass)};
@@ -239,6 +341,7 @@ public:
         AddTrayIcon();
         SetTimer(window_, kTimerId, 2000, nullptr);
         Tick();
+        if (openSettingsOnStart && window_) PostMessageW(window_, kOpenSettingsMessage, 0, 0);
     }
 
     ~TrayApp() {
@@ -283,6 +386,7 @@ private:
 
     LRESULT HandleMessage(UINT message, WPARAM wParam, LPARAM lParam) {
         if (message == taskbarCreated_) { AddTrayIcon(); return 0; }
+        if (message == kOpenSettingsMessage) { ShowSettings(); return 0; }
         switch (message) {
             case WM_TIMER: Tick(); return 0;
             case kTrayCallback:
@@ -348,15 +452,18 @@ private:
     void Tick() {
         if (stopEvent_ && WaitForSingleObject(stopEvent_.get(), 0) == WAIT_OBJECT_0) { DestroyWindow(window_); window_ = nullptr; return; }
         auto loaded = il2mec::LoadAutoSaveOptions(settingsPath_);
-        if (!loaded.enabled) { Log(L"Autosave is disabled; the tray agent is exiting."); DestroyWindow(window_); window_ = nullptr; return; }
-        bool scheduleChanged = loaded.intervalMinutes != options_.intervalMinutes || loaded.greatBattles != options_.greatBattles || loaded.korea != options_.korea;
+        bool scheduleChanged = loaded.enabled != options_.enabled || loaded.intervalMinutes != options_.intervalMinutes ||
+                               loaded.greatBattles != options_.greatBattles || loaded.korea != options_.korea;
         bool retentionChanged = loaded.historicSnapshots != options_.historicSnapshots;
         options_ = loaded;
         if (scheduleChanged) nextSave_.clear();
         if (retentionChanged) { store_ = il2mec::SnapshotStore(il2mec::DefaultSnapshotRoot(), options_.historicSnapshots); store_.PruneToRetentionLimit(); }
         tray_.uFlags = NIF_TIP;
-        std::wstring tip = L"IL-2 Mission Guard: every " + std::to_wstring(options_.intervalMinutes) + L" min";
+        std::wstring tip = options_.enabled
+            ? L"IL-2 Mission Guard: every " + std::to_wstring(options_.intervalMinutes) + L" min"
+            : L"IL-2 Mission Guard: autosave disabled";
         wcsncpy_s(tray_.szTip, tip.c_str(), _TRUNCATE); Shell_NotifyIconW(NIM_MODIFY, &tray_);
+        if (!options_.enabled) return;
         SaveDue(false);
     }
 
@@ -431,6 +538,8 @@ private:
             AppendMenuW(restore, MF_STRING | (snapshot.IsRestorable() ? 0 : MF_GRAYED), kRestoreFirst + static_cast<UINT>(i), text.c_str());
         }
         AppendMenuW(menu, MF_POPUP, reinterpret_cast<UINT_PTR>(restore), L"Restore previous autosave");
+        AppendMenuW(menu, MF_SEPARATOR, 0, nullptr);
+        AppendMenuW(menu, MF_STRING, kMenuSettings, L"Settings...");
         AppendMenuW(menu, MF_STRING, kMenuFolder, L"Open autosave folder");
         AppendMenuW(menu, MF_STRING, kMenuLog, L"Open autosave log");
         AppendMenuW(menu, MF_SEPARATOR, 0, nullptr);
@@ -443,10 +552,28 @@ private:
 
     void HandleCommand(UINT command) {
         if (command == kMenuSave) SaveDue(true);
+        else if (command == kMenuSettings) ShowSettings();
         else if (command == kMenuFolder) OpenPath(store_.RootDirectory(), true);
         else if (command == kMenuLog) { Log(L"Autosave log opened from the tray menu."); OpenPath(il2mec::DefaultLogPath(), false); }
         else if (command == kMenuExit) { DestroyWindow(window_); window_ = nullptr; }
         else if (command >= kRestoreFirst && command <= kRestoreLast && command - kRestoreFirst < restoreItems_.size()) Restore(restoreItems_[command - kRestoreFirst]);
+    }
+
+    void ShowSettings() {
+        SettingsDialogState state{options_, settingsPath_, instance_, false};
+        const INT_PTR result = DialogBoxParamW(
+            instance_, MAKEINTRESOURCEW(IDD_SETTINGS), nullptr,
+            SettingsDialogProcedure, reinterpret_cast<LPARAM>(&state));
+        if (result == -1) {
+            const std::wstring error = L"Windows could not open the settings dialog.\n\n" + il2mec::Win32ErrorMessage();
+            Log(error);
+            MessageBoxW(nullptr, error.c_str(), L"IL-2 Mission Guard", MB_OK | MB_ICONERROR);
+            return;
+        }
+        if (state.saved) {
+            Log(L"Autosave settings were updated from the tray menu.");
+            Tick();
+        }
     }
 
     void OpenPath(const fs::path& path, bool directory) {
@@ -507,18 +634,25 @@ private:
 
 }  // namespace
 
-int WINAPI wWinMain(HINSTANCE instance, HINSTANCE, PWSTR, int) {
+int WINAPI wWinMain(HINSTANCE instance, HINSTANCE, PWSTR commandLine, int) {
     try {
+        const bool openSettings = commandLine && wcsstr(commandLine, L"--settings") != nullptr;
         UniqueHandle mutex(CreateMutexW(nullptr, TRUE, kMutexName));
-        if (!mutex || GetLastError() == ERROR_ALREADY_EXISTS) return 0;
+        if (!mutex) return 0;
+        if (GetLastError() == ERROR_ALREADY_EXISTS) {
+            if (openSettings) {
+                HWND existing = FindWindowExW(HWND_MESSAGE, nullptr, kWindowClass, nullptr);
+                if (existing) PostMessageW(existing, kOpenSettingsMessage, 0, 0);
+            }
+            return 0;
+        }
         wchar_t settingsOverride[32768]{};
         DWORD length = GetEnvironmentVariableW(L"IL2MISSIONGUARD_SETTINGS_FILE", settingsOverride, static_cast<DWORD>(std::size(settingsOverride)));
         if (length == 0) {
             length = GetEnvironmentVariableW(L"IL2MEC_SETTINGS_FILE", settingsOverride, static_cast<DWORD>(std::size(settingsOverride)));
         }
         fs::path settings = length > 0 && length < std::size(settingsOverride) ? fs::path(settingsOverride) : il2mec::DefaultSettingsPath();
-        if (!il2mec::LoadAutoSaveOptions(settings).enabled) return 0;
-        TrayApp app(instance, settings);
+        TrayApp app(instance, settings, openSettings);
         return app.Run();
     } catch (const std::exception& error) {
         MessageBoxW(nullptr, il2mec::Utf8ToWide(error.what()).c_str(), L"IL-2 Mission Guard", MB_OK | MB_ICONERROR);

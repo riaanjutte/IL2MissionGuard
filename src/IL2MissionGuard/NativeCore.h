@@ -53,6 +53,9 @@ std::filesystem::path DefaultSnapshotRoot();
 std::filesystem::path LegacySnapshotRoot();
 std::filesystem::path DefaultLogPath();
 AutoSaveOptions LoadAutoSaveOptions(const std::filesystem::path& settingsPath);
+void SaveAutoSaveOptions(
+    const std::filesystem::path& settingsPath,
+    const AutoSaveOptions& options);
 
 bool TryGetSavedMissionPath(
     const std::wstring& windowTitle,

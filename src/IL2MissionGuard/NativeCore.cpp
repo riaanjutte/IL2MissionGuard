@@ -475,6 +475,40 @@ AutoSaveOptions LoadAutoSaveOptions(const fs::path& settingsPath) {
     return options;
 }
 
+void SaveAutoSaveOptions(const fs::path& settingsValue, const AutoSaveOptions& options) {
+    if (options.intervalMinutes < 1 || options.intervalMinutes > 60 ||
+        options.historicSnapshots < 1 || options.historicSnapshots > 100 ||
+        (options.enabled && !options.greatBattles && !options.korea)) {
+        throw std::invalid_argument("The autosave settings are outside the supported range.");
+    }
+
+    fs::path settingsPath = FullPath(settingsValue);
+    fs::create_directories(settingsPath.parent_path());
+    const bool existed = fs::is_regular_file(settingsPath);
+    const std::string original = existed ? ReadUtf8File(settingsPath) : std::string{};
+    auto write = [&](const wchar_t* key, const std::wstring& value) {
+        if (!WritePrivateProfileStringW(L"AutoSave", key, value.c_str(), settingsPath.c_str())) {
+            throw std::runtime_error("Windows could not update the autosave settings file.");
+        }
+    };
+
+    try {
+        write(L"Enabled", options.enabled ? L"true" : L"false");
+        write(L"GreatBattles", options.greatBattles ? L"true" : L"false");
+        write(L"Korea", options.korea ? L"true" : L"false");
+        write(L"IntervalMinutes", std::to_wstring(options.intervalMinutes));
+        write(L"HistoricSnapshots", std::to_wstring(options.historicSnapshots));
+        write(L"TrayNotifications", options.trayNotifications ? L"true" : L"false");
+        WritePrivateProfileStringW(nullptr, nullptr, nullptr, settingsPath.c_str());
+    } catch (...) {
+        std::error_code ignored;
+        if (existed) WriteUtf8Atomically(settingsPath, original);
+        else fs::remove(settingsPath, ignored);
+        WritePrivateProfileStringW(nullptr, nullptr, nullptr, settingsPath.c_str());
+        throw;
+    }
+}
+
 bool TryGetSavedMissionPath(const std::wstring& title, fs::path& missionPath, bool requireExists) {
     const auto separator = title.find(L" - ");
     if (separator == std::wstring::npos) return false;
