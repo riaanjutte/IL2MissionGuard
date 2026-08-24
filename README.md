@@ -4,7 +4,7 @@ IL-2 Mission Guard is a lightweight native Windows tray application that protect
 
 It asks the editor to run its normal **File > Save** command at a configurable interval, waits for the complete mission family to finish writing, and creates timestamped recovery points that can be restored from the tray menu.
 
-The application was originally developed as the autosave component of [IL2MEC](https://github.com/riaanjutte/IL2MEC). It is now maintained as an independent open-source project. Compatibility identifiers and storage locations are intentionally retained so existing IL2MEC settings and recovery points continue to work.
+The application was originally developed as the autosave component of IL2MEC. It is now maintained as an independent open-source project. Compatibility identifiers and storage locations are intentionally retained so existing IL2MEC settings and recovery points continue to work.
 
 ## Features
 
@@ -126,4 +126,3 @@ They allow the standalone project and IL2MEC-distributed compatibility build to 
 IL-2 Mission Guard is available under the [MIT License](LICENSE).
 
 IL-2 Sturmovik and related names are trademarks of their respective owners. This project is an independent community tool and is not affiliated with or endorsed by 1C Game Studios.
-
