@@ -1,0 +1,12 @@
+.vs/
+artifacts/
+**/bin/
+**/obj/
+*.user
+*.suo
+*.pdb
+*.ilk
+*.iobj
+*.ipdb
+*.recipe
+
