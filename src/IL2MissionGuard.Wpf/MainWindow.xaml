@@ -50,7 +50,7 @@
                     </Border>
                     <StackPanel Margin="12,2,0,0">
                         <TextBlock Text="MISSION GUARD" FontSize="11" FontWeight="Bold" Foreground="#55A8FF" />
-                        <TextBlock Text="IL-2 protection" FontSize="16" FontWeight="SemiBold" />
+                        <TextBlock Text="Auto-Save" FontSize="16" FontWeight="SemiBold" />
                     </StackPanel>
                 </StackPanel>
 
