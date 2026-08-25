@@ -50,7 +50,7 @@ static void TestMissionTitle(string root)
 
 static void TestUpdateMetadata()
 {
-    Require(UpdateService.CurrentVersion == "0.1.0-beta.1", "application version metadata");
+    Require(UpdateService.CurrentVersion == "0.1.0-beta.2", "application version metadata");
     Require(UpdateService.IsNewerVersion("v2.0.0", "1.99.99"), "version comparison");
     Require(UpdateService.IsNewerVersion("v0.1.0-beta.2", "0.1.0-beta.1") &&
             UpdateService.IsNewerVersion("0.1.0", "0.1.0-beta.2") &&

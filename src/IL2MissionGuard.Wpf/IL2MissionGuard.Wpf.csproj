@@ -12,9 +12,9 @@
     <RootNamespace>IL2MissionGuard</RootNamespace>
     <ApplicationIcon>..\..\assets\IL2MissionGuard.ico</ApplicationIcon>
     <ApplicationManifest>app.manifest</ApplicationManifest>
-    <Version>0.1.0-beta.1</Version>
-    <InformationalVersion>0.1.0-beta.1</InformationalVersion>
-    <FileVersion>0.1.0.1</FileVersion>
+    <Version>0.1.0-beta.2</Version>
+    <InformationalVersion>0.1.0-beta.2</InformationalVersion>
+    <FileVersion>0.1.0.2</FileVersion>
     <AssemblyVersion>0.1.0.0</AssemblyVersion>
     <Product>IL-2 Mission Guard</Product>
     <Description>Automatic recovery points for IL-2 Mission Editors</Description>

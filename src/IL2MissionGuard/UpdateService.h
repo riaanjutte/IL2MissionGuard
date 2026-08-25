@@ -6,7 +6,7 @@
 
 namespace missionguard {
 
-inline constexpr wchar_t kCurrentVersion[] = L"0.1.0-beta.1";
+inline constexpr wchar_t kCurrentVersion[] = L"0.1.0-beta.2";
 
 GitHubRelease FetchLatestGitHubRelease();
 std::filesystem::path DownloadVerifiedUpdate(const GitHubRelease& release);
