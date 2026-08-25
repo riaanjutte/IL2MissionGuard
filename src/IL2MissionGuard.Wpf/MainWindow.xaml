@@ -180,7 +180,30 @@
                         <DataGrid.Columns>
                             <DataGridTextColumn Header="Created" Binding="{Binding CreatedLocal}" />
                             <DataGridTextColumn Header="Mission" Binding="{Binding Mission}" />
-                            <DataGridTextColumn Header="Editor" Binding="{Binding Editor}" />
+                            <DataGridTemplateColumn Header="Editor" Width="132">
+                                <DataGridTemplateColumn.CellTemplate>
+                                    <DataTemplate>
+                                        <Border Width="116" Height="28" CornerRadius="5" Background="#FF15191E"
+                                                HorizontalAlignment="Left" VerticalAlignment="Center">
+                                            <Image Height="22" MaxWidth="108" Stretch="Uniform"
+                                                   ToolTip="{Binding Editor}"
+                                                   RenderOptions.BitmapScalingMode="HighQuality"
+                                                   SnapsToDevicePixels="True">
+                                                <Image.Style>
+                                                    <Style TargetType="{x:Type Image}">
+                                                        <Setter Property="Source" Value="Assets/IL2-Korea.png" />
+                                                        <Style.Triggers>
+                                                            <DataTrigger Binding="{Binding Editor}" Value="Great Battles">
+                                                                <Setter Property="Source" Value="Assets/IL2-Great-Battles.png" />
+                                                            </DataTrigger>
+                                                        </Style.Triggers>
+                                                    </Style>
+                                                </Image.Style>
+                                            </Image>
+                                        </Border>
+                                    </DataTemplate>
+                                </DataGridTemplateColumn.CellTemplate>
+                            </DataGridTemplateColumn>
                             <DataGridTextColumn Header="Files" Binding="{Binding FileCount}" />
                             <DataGridTextColumn Header="Integrity" Binding="{Binding Integrity}" />
                         </DataGrid.Columns>
