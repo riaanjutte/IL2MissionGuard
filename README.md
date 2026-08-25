@@ -18,6 +18,8 @@ The application was originally developed as the autosave component of IL2MEC. It
 - Creates a separate safety backup before replacing current mission files.
 - Closes and reopens the matching editor when restoring a mission.
 - Imports legacy recovery points without deleting the old copies.
+- Checks the official GitHub Releases feed for updates without blocking the tray application.
+- Downloads only the expected release executable and verifies GitHub's published SHA-256 digest before installation.
 - Uses a native Win32 tray process with no .NET or WinForms dependency.
 
 The native process typically uses about **10 MB of working memory** and **1–2 MB of private memory** while idle.
@@ -41,7 +43,8 @@ Right-click the tray icon to:
 - restore a previous recovery point;
 - open **Settings...** to configure every autosave option;
 - open the recovery-point folder;
-- open the diagnostic log; or
+- open the diagnostic log;
+- check for updates or install an available update; or
 - exit Mission Guard.
 
 You can also open the same dialog directly with `IL2MissionGuard.exe --settings`. If Mission Guard is already running, the command opens Settings in the existing tray process.
@@ -69,6 +72,14 @@ TrayNotifications=true
 `IntervalMinutes` accepts 1–60 and `HistoricSnapshots` accepts 1–100. IL2MEC can continue to manage these settings and install the compatibility build automatically.
 
 For isolated testing, set `IL2MISSIONGUARD_SETTINGS_FILE` to an alternative INI path. The legacy `IL2MEC_SETTINGS_FILE` override is also accepted.
+
+## Updates
+
+Mission Guard checks the repository's latest stable GitHub release after startup. The check runs in the background. When a newer version is available, a tray notification and an **Install update** menu item appear. You can also choose **Check for updates...** at any time.
+
+`IL2MissionGuard.exe --check-updates` opens the same manual update check in a running tray process.
+
+Installation always requires confirmation. Mission Guard downloads the exact `IL2MissionGuard.exe` release asset over HTTPS, verifies it against the SHA-256 digest published by GitHub, replaces the running executable after it exits, and restarts it. Update failures leave the existing executable intact and are written to the diagnostic log.
 
 ## Storage
 
@@ -112,6 +123,7 @@ Warnings are treated as errors. Production builds use C++20, Unicode, `/utf-8`, 
 - A restore never begins until the matching editor has closed.
 - Current files are backed up before replacement, and a failed replacement attempts an automatic rollback.
 - Snapshot paths and filenames are constrained to their expected directories to prevent metadata path traversal.
+- Update metadata and downloads are accepted only from the project's expected GitHub release URLs, and the downloaded executable must pass SHA-256 verification before it can run.
 
 ## Compatibility contracts
 

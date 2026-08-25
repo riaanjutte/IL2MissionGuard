@@ -19,11 +19,11 @@
   </PropertyGroup>
   <ItemDefinitionGroup Condition="'$(Configuration)|$(Platform)'=='Release|x64'">
     <ClCompile><WarningLevel>Level4</WarningLevel><TreatWarningAsError>true</TreatWarningAsError><FunctionLevelLinking>true</FunctionLevelLinking><IntrinsicFunctions>true</IntrinsicFunctions><SDLCheck>true</SDLCheck><ConformanceMode>true</ConformanceMode><LanguageStandard>stdcpp20</LanguageStandard><AdditionalOptions>/utf-8 %(AdditionalOptions)</AdditionalOptions><PreprocessorDefinitions>WIN32_LEAN_AND_MEAN;NOMINMAX;UNICODE;_UNICODE;%(PreprocessorDefinitions)</PreprocessorDefinitions><RuntimeLibrary>MultiThreaded</RuntimeLibrary></ClCompile>
-    <Link><SubSystem>Windows</SubSystem><EnableCOMDATFolding>true</EnableCOMDATFolding><OptimizeReferences>true</OptimizeReferences><GenerateDebugInformation>false</GenerateDebugInformation><AdditionalDependencies>user32.lib;shell32.lib;advapi32.lib;bcrypt.lib;ole32.lib;%(AdditionalDependencies)</AdditionalDependencies></Link>
+    <Link><SubSystem>Windows</SubSystem><EnableCOMDATFolding>true</EnableCOMDATFolding><OptimizeReferences>true</OptimizeReferences><GenerateDebugInformation>false</GenerateDebugInformation><AdditionalDependencies>user32.lib;shell32.lib;advapi32.lib;bcrypt.lib;ole32.lib;winhttp.lib;%(AdditionalDependencies)</AdditionalDependencies></Link>
     <ResourceCompile><PreprocessorDefinitions>UNICODE;_UNICODE;%(PreprocessorDefinitions)</PreprocessorDefinitions></ResourceCompile>
   </ItemDefinitionGroup>
-  <ItemGroup><ClCompile Include="NativeCore.cpp"/><ClCompile Include="TrayApp.cpp"/></ItemGroup>
-  <ItemGroup><ClInclude Include="NativeCore.h"/><ClInclude Include="resource.h"/></ItemGroup>
+  <ItemGroup><ClCompile Include="NativeCore.cpp"/><ClCompile Include="TrayApp.cpp"/><ClCompile Include="UpdateService.cpp"/></ItemGroup>
+  <ItemGroup><ClInclude Include="NativeCore.h"/><ClInclude Include="resource.h"/><ClInclude Include="UpdateService.h"/></ItemGroup>
   <ItemGroup><ResourceCompile Include="IL2MissionGuard.rc"/></ItemGroup>
   <ItemGroup><Manifest Include="app.manifest"/></ItemGroup>
   <Import Project="$(VCTargetsPath)\Microsoft.Cpp.targets" />

@@ -345,6 +345,16 @@ const JsonParser::Value& Member(const JsonParser::Value& object, const char* nam
     return found->second;
 }
 
+bool HasPrefix(const std::wstring& value, const std::wstring& prefix) {
+    return value.size() >= prefix.size() && value.compare(0, prefix.size(), prefix) == 0;
+}
+
+bool IsSha256(const std::wstring& value) {
+    return value.size() == 64 && std::all_of(value.begin(), value.end(), [](wchar_t c) {
+        return (c >= L'0' && c <= L'9') || (c >= L'a' && c <= L'f') || (c >= L'A' && c <= L'F');
+    });
+}
+
 std::string SerializeSnapshot(const Snapshot& snapshot) {
     std::ostringstream output;
     output << "{\n  \"SchemaVersion\": 1,\n"
@@ -507,6 +517,64 @@ void SaveAutoSaveOptions(const fs::path& settingsValue, const AutoSaveOptions& o
         WritePrivateProfileStringW(nullptr, nullptr, nullptr, settingsPath.c_str());
         throw;
     }
+}
+
+std::optional<SemanticVersion> ParseSemanticVersion(const std::wstring& input) {
+    std::wstring value = Trim(input);
+    if (!value.empty() && (value.front() == L'v' || value.front() == L'V')) value.erase(value.begin());
+    SemanticVersion result;
+    int* parts[] = {&result.major, &result.minor, &result.patch};
+    std::size_t start = 0;
+    for (std::size_t index = 0; index < std::size(parts); ++index) {
+        const std::size_t end = value.find(L'.', start);
+        if ((index < 2 && end == std::wstring::npos) || (index == 2 && end != std::wstring::npos)) return std::nullopt;
+        const std::wstring piece = value.substr(start, end == std::wstring::npos ? end : end - start);
+        if (piece.empty() || !std::all_of(piece.begin(), piece.end(), [](wchar_t c) { return c >= L'0' && c <= L'9'; })) return std::nullopt;
+        try {
+            std::size_t consumed = 0;
+            const long parsed = std::stol(piece, &consumed, 10);
+            if (consumed != piece.size() || parsed > INT_MAX) return std::nullopt;
+            *parts[index] = static_cast<int>(parsed);
+        } catch (...) { return std::nullopt; }
+        start = end == std::wstring::npos ? value.size() : end + 1;
+    }
+    return result;
+}
+
+bool IsNewerVersion(const std::wstring& candidate, const std::wstring& current) {
+    const auto left = ParseSemanticVersion(candidate);
+    const auto right = ParseSemanticVersion(current);
+    if (!left || !right) throw std::invalid_argument("A release version is not valid semantic version text.");
+    if (left->major != right->major) return left->major > right->major;
+    if (left->minor != right->minor) return left->minor > right->minor;
+    return left->patch > right->patch;
+}
+
+GitHubRelease ParseGitHubLatestReleaseJson(const std::string& json) {
+    const auto root = JsonParser(json).Parse();
+    if (root.type != JsonParser::Value::Type::Object) throw std::runtime_error("The GitHub release response is not an object.");
+    GitHubRelease release;
+    release.version = Utf8ToWide(Member(root, "tag_name", JsonParser::Value::Type::String).string);
+    release.releaseUrl = Utf8ToWide(Member(root, "html_url", JsonParser::Value::Type::String).string);
+    if (!ParseSemanticVersion(release.version)) throw std::runtime_error("The latest GitHub release has an invalid version tag.");
+
+    constexpr wchar_t releasePrefix[] = L"https://github.com/riaanjutte/IL2MissionGuard/releases/";
+    constexpr wchar_t assetPrefix[] = L"https://github.com/riaanjutte/IL2MissionGuard/releases/download/";
+    if (!HasPrefix(release.releaseUrl, releasePrefix)) throw std::runtime_error("The GitHub release URL is not trusted.");
+
+    const auto& assets = Member(root, "assets", JsonParser::Value::Type::Array);
+    for (const auto& asset : assets.array) {
+        if (asset.type != JsonParser::Value::Type::Object) continue;
+        const auto name = asset.object.find("name");
+        if (name == asset.object.end() || name->second.type != JsonParser::Value::Type::String || name->second.string != "IL2MissionGuard.exe") continue;
+        release.assetUrl = Utf8ToWide(Member(asset, "browser_download_url", JsonParser::Value::Type::String).string);
+        std::wstring digest = Utf8ToWide(Member(asset, "digest", JsonParser::Value::Type::String).string);
+        if (!HasPrefix(release.assetUrl, assetPrefix)) throw std::runtime_error("The update asset URL is not trusted.");
+        if (!HasPrefix(digest, L"sha256:") || !IsSha256(digest.substr(7))) throw std::runtime_error("The update asset has no valid SHA-256 digest.");
+        release.sha256 = Lower(digest.substr(7));
+        return release;
+    }
+    throw std::runtime_error("The latest GitHub release does not contain IL2MissionGuard.exe.");
 }
 
 bool TryGetSavedMissionPath(const std::wstring& title, fs::path& missionPath, bool requireExists) {

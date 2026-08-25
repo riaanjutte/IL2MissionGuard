@@ -47,6 +47,21 @@ struct RestoreResult {
     std::size_t restoredFileCount = 0;
 };
 
+struct SemanticVersion {
+    int major = 0;
+    int minor = 0;
+    int patch = 0;
+
+    bool operator==(const SemanticVersion&) const = default;
+};
+
+struct GitHubRelease {
+    std::wstring version;
+    std::wstring releaseUrl;
+    std::wstring assetUrl;
+    std::wstring sha256;
+};
+
 std::filesystem::path LocalAppDataDirectory();
 std::filesystem::path DefaultSettingsPath();
 std::filesystem::path DefaultSnapshotRoot();
@@ -71,6 +86,9 @@ void WaitUntilMissionFamilyStable(
 std::wstring Sha256File(const std::filesystem::path& path);
 std::wstring FormatLocalSnapshotTime(std::chrono::system_clock::time_point value);
 std::wstring FormatLocalMenuTime(std::chrono::system_clock::time_point value);
+std::optional<SemanticVersion> ParseSemanticVersion(const std::wstring& value);
+bool IsNewerVersion(const std::wstring& candidate, const std::wstring& current);
+GitHubRelease ParseGitHubLatestReleaseJson(const std::string& json);
 
 class SnapshotStore {
 public:

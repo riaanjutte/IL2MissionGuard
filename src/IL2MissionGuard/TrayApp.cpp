@@ -1,10 +1,12 @@
 #include "NativeCore.h"
 #include "resource.h"
+#include "UpdateService.h"
 
 #include <shellapi.h>
 #include <tlhelp32.h>
 
 #include <algorithm>
+#include <atomic>
 #include <chrono>
 #include <filesystem>
 #include <fstream>
@@ -27,6 +29,8 @@ constexpr wchar_t kMutexName[] = L"Local\\IL2MEC.AutoSave.Agent";
 constexpr wchar_t kStopEventName[] = L"Local\\IL2MEC.AutoSave.Stop";
 constexpr UINT kTrayCallback = WM_APP + 1;
 constexpr UINT kOpenSettingsMessage = WM_APP + 2;
+constexpr UINT kUpdateWorkerComplete = WM_APP + 3;
+constexpr UINT kRequestUpdateCheck = WM_APP + 4;
 constexpr UINT kTimerId = 1;
 constexpr UINT kSaveCommandId = 0x8037;
 constexpr UINT kMenuSave = 1001;
@@ -34,6 +38,8 @@ constexpr UINT kMenuFolder = 1002;
 constexpr UINT kMenuLog = 1003;
 constexpr UINT kMenuExit = 1004;
 constexpr UINT kMenuSettings = 1005;
+constexpr UINT kMenuCheckUpdates = 1006;
+constexpr UINT kMenuInstallUpdate = 1007;
 constexpr UINT kRestoreFirst = 2000;
 constexpr UINT kRestoreLast = 2199;
 
@@ -53,6 +59,14 @@ struct SettingsDialogState {
     fs::path settingsPath;
     HINSTANCE instance = nullptr;
     bool saved = false;
+};
+
+struct UpdateWorkerResult {
+    enum class Kind { Check, Download } kind = Kind::Check;
+    bool manual = false;
+    std::optional<il2mec::GitHubRelease> release;
+    fs::path downloadedExecutable;
+    std::wstring error;
 };
 
 void UpdateSettingsControlState(HWND dialog) {
@@ -319,7 +333,7 @@ bool OpenMission(const fs::path& executable, const std::wstring& processName, co
 
 class TrayApp {
 public:
-    TrayApp(HINSTANCE instance, fs::path settingsPath, bool openSettingsOnStart)
+    TrayApp(HINSTANCE instance, fs::path settingsPath, bool openSettingsOnStart, bool manualUpdateCheckOnStart)
         : instance_(instance), settingsPath_(std::move(settingsPath)), options_(il2mec::LoadAutoSaveOptions(settingsPath_)),
           store_(il2mec::DefaultSnapshotRoot(), options_.historicSnapshots) {
         WNDCLASSEXW windowClass{sizeof(windowClass)};
@@ -342,6 +356,7 @@ public:
         SetTimer(window_, kTimerId, 2000, nullptr);
         Tick();
         if (openSettingsOnStart && window_) PostMessageW(window_, kOpenSettingsMessage, 0, 0);
+        StartUpdateCheck(manualUpdateCheckOnStart);
     }
 
     ~TrayApp() {
@@ -367,6 +382,9 @@ private:
     NOTIFYICONDATAW tray_{sizeof(tray_)};
     std::map<DWORD, std::chrono::steady_clock::time_point> nextSave_;
     std::vector<il2mec::Snapshot> restoreItems_;
+    std::optional<il2mec::GitHubRelease> availableUpdate_;
+    std::jthread updateWorker_;
+    std::atomic<bool> updateWorkInProgress_{false};
 
     static LRESULT CALLBACK WindowProcedure(HWND window, UINT message, WPARAM wParam, LPARAM lParam) {
         TrayApp* app = reinterpret_cast<TrayApp*>(GetWindowLongPtrW(window, GWLP_USERDATA));
@@ -387,10 +405,19 @@ private:
     LRESULT HandleMessage(UINT message, WPARAM wParam, LPARAM lParam) {
         if (message == taskbarCreated_) { AddTrayIcon(); return 0; }
         if (message == kOpenSettingsMessage) { ShowSettings(); return 0; }
+        if (message == kRequestUpdateCheck) { StartUpdateCheck(true); return 0; }
+        if (message == kUpdateWorkerComplete) {
+            std::unique_ptr<UpdateWorkerResult> result(reinterpret_cast<UpdateWorkerResult*>(lParam));
+            updateWorkInProgress_ = false;
+            if (result->kind == UpdateWorkerResult::Kind::Check) HandleUpdateCheck(*result);
+            else HandleUpdateDownload(*result);
+            return 0;
+        }
         switch (message) {
             case WM_TIMER: Tick(); return 0;
             case kTrayCallback:
                 if (LOWORD(lParam) == WM_RBUTTONUP || LOWORD(lParam) == WM_CONTEXTMENU) ShowMenu();
+                else if (LOWORD(lParam) == NIN_BALLOONUSERCLICK && availableUpdate_) PromptToInstallUpdate();
                 return 0;
             case WM_COMMAND: HandleCommand(LOWORD(wParam)); return 0;
             case WM_DESTROY: PostQuitMessage(0); return 0;
@@ -422,8 +449,8 @@ private:
         if (tray_.hIcon) { DestroyIcon(tray_.hIcon); tray_.hIcon = nullptr; }
     }
 
-    void Notify(const std::wstring& title, const std::wstring& message, DWORD flags) {
-        if (!options_.trayNotifications) return;
+    void Notify(const std::wstring& title, const std::wstring& message, DWORD flags, bool honorPreference = true) {
+        if (honorPreference && !options_.trayNotifications) return;
         tray_.uFlags = NIF_INFO;
         wcsncpy_s(tray_.szInfoTitle, title.c_str(), _TRUNCATE);
         wcsncpy_s(tray_.szInfo, message.c_str(), _TRUNCATE);
@@ -543,6 +570,13 @@ private:
         AppendMenuW(menu, MF_STRING, kMenuFolder, L"Open autosave folder");
         AppendMenuW(menu, MF_STRING, kMenuLog, L"Open autosave log");
         AppendMenuW(menu, MF_SEPARATOR, 0, nullptr);
+        if (availableUpdate_) {
+            const std::wstring install = L"Install update " + availableUpdate_->version + L"...";
+            AppendMenuW(menu, MF_STRING, kMenuInstallUpdate, install.c_str());
+        }
+        AppendMenuW(menu, MF_STRING | (updateWorkInProgress_ ? MF_GRAYED : 0), kMenuCheckUpdates,
+                    updateWorkInProgress_ ? L"Checking for updates..." : L"Check for updates...");
+        AppendMenuW(menu, MF_SEPARATOR, 0, nullptr);
         AppendMenuW(menu, MF_STRING, kMenuExit, L"Exit");
         POINT point{}; GetCursorPos(&point); SetForegroundWindow(window_);
         UINT command = TrackPopupMenu(menu, TPM_RETURNCMD | TPM_RIGHTBUTTON | TPM_NONOTIFY, point.x, point.y, 0, window_, nullptr);
@@ -555,6 +589,8 @@ private:
         else if (command == kMenuSettings) ShowSettings();
         else if (command == kMenuFolder) OpenPath(store_.RootDirectory(), true);
         else if (command == kMenuLog) { Log(L"Autosave log opened from the tray menu."); OpenPath(il2mec::DefaultLogPath(), false); }
+        else if (command == kMenuCheckUpdates) StartUpdateCheck(true);
+        else if (command == kMenuInstallUpdate && availableUpdate_) PromptToInstallUpdate();
         else if (command == kMenuExit) { DestroyWindow(window_); window_ = nullptr; }
         else if (command >= kRestoreFirst && command <= kRestoreLast && command - kRestoreFirst < restoreItems_.size()) Restore(restoreItems_[command - kRestoreFirst]);
     }
@@ -573,6 +609,92 @@ private:
         if (state.saved) {
             Log(L"Autosave settings were updated from the tray menu.");
             Tick();
+        }
+    }
+
+    void PrepareUpdateWorker() {
+        if (updateWorker_.joinable()) updateWorker_.join();
+    }
+
+    void StartUpdateCheck(bool manual) {
+        if (updateWorkInProgress_.exchange(true)) {
+            if (manual) MessageBoxW(nullptr, L"Mission Guard is already checking for an update.", L"IL-2 Mission Guard update", MB_OK | MB_ICONINFORMATION);
+            return;
+        }
+        PrepareUpdateWorker();
+        const HWND target = window_;
+        updateWorker_ = std::jthread([target, manual] {
+            auto result = std::make_unique<UpdateWorkerResult>();
+            result->kind = UpdateWorkerResult::Kind::Check;
+            result->manual = manual;
+            try { result->release = il2mec::FetchLatestGitHubRelease(); }
+            catch (const std::exception& error) { result->error = il2mec::Utf8ToWide(error.what()); }
+            if (!PostMessageW(target, kUpdateWorkerComplete, 0, reinterpret_cast<LPARAM>(result.get()))) return;
+            result.release();
+        });
+    }
+
+    void HandleUpdateCheck(const UpdateWorkerResult& result) {
+        if (!result.error.empty()) {
+            Log(L"Update check failed: " + result.error);
+            if (result.manual) MessageBoxW(nullptr, (L"Mission Guard could not check GitHub for updates.\n\n" + result.error).c_str(),
+                                           L"IL-2 Mission Guard update", MB_OK | MB_ICONERROR);
+            return;
+        }
+        if (!result.release || !il2mec::IsNewerVersion(result.release->version, il2mec::kCurrentVersion)) {
+            availableUpdate_.reset();
+            if (result.manual) MessageBoxW(nullptr, (L"IL-2 Mission Guard " + std::wstring(il2mec::kCurrentVersion) + L" is up to date.").c_str(),
+                                           L"IL-2 Mission Guard update", MB_OK | MB_ICONINFORMATION);
+            return;
+        }
+        availableUpdate_ = result.release;
+        Log(L"Update available: " + availableUpdate_->version);
+        if (result.manual) PromptToInstallUpdate();
+        else Notify(L"Mission Guard update available",
+                    availableUpdate_->version + L" is available. Click here or use the tray menu to install it.", NIIF_INFO, false);
+    }
+
+    void PromptToInstallUpdate() {
+        if (!availableUpdate_) return;
+        const std::wstring message = std::wstring(L"IL-2 Mission Guard ") + availableUpdate_->version + L" is available.\n\n"
+            L"Current version: " + std::wstring(il2mec::kCurrentVersion) + L"\n\nDownload, verify, install, and restart Mission Guard now?";
+        if (MessageBoxW(nullptr, message.c_str(), L"IL-2 Mission Guard update", MB_YESNO | MB_ICONINFORMATION) == IDYES) {
+            StartUpdateDownload(*availableUpdate_);
+        }
+    }
+
+    void StartUpdateDownload(il2mec::GitHubRelease release) {
+        if (updateWorkInProgress_.exchange(true)) return;
+        PrepareUpdateWorker();
+        const HWND target = window_;
+        updateWorker_ = std::jthread([target, release = std::move(release)] {
+            auto result = std::make_unique<UpdateWorkerResult>();
+            result->kind = UpdateWorkerResult::Kind::Download;
+            result->release = release;
+            try { result->downloadedExecutable = il2mec::DownloadVerifiedUpdate(release); }
+            catch (const std::exception& error) { result->error = il2mec::Utf8ToWide(error.what()); }
+            if (!PostMessageW(target, kUpdateWorkerComplete, 0, reinterpret_cast<LPARAM>(result.get()))) return;
+            result.release();
+        });
+    }
+
+    void HandleUpdateDownload(const UpdateWorkerResult& result) {
+        if (!result.error.empty()) {
+            Log(L"Update download failed: " + result.error);
+            MessageBoxW(nullptr, (L"The update could not be downloaded and verified.\n\n" + result.error).c_str(),
+                        L"IL-2 Mission Guard update", MB_OK | MB_ICONERROR);
+            return;
+        }
+        try {
+            il2mec::LaunchSelfUpdate(result.downloadedExecutable, il2mec::CurrentExecutablePath(), GetCurrentProcessId());
+            Log(L"Verified update installer started for " + (result.release ? result.release->version : std::wstring(L"new release")) + L".");
+            DestroyWindow(window_);
+            window_ = nullptr;
+        } catch (const std::exception& error) {
+            const std::wstring detail = il2mec::Utf8ToWide(error.what());
+            Log(L"Update installation failed: " + detail);
+            MessageBoxW(nullptr, (L"The verified update could not be installed.\n\n" + detail).c_str(),
+                        L"IL-2 Mission Guard update", MB_OK | MB_ICONERROR);
         }
     }
 
@@ -634,15 +756,34 @@ private:
 
 }  // namespace
 
-int WINAPI wWinMain(HINSTANCE instance, HINSTANCE, PWSTR commandLine, int) {
+int WINAPI wWinMain(HINSTANCE instance, HINSTANCE, PWSTR, int) {
     try {
-        const bool openSettings = commandLine && wcsstr(commandLine, L"--settings") != nullptr;
+        int argumentCount = 0;
+        LPWSTR* rawArguments = CommandLineToArgvW(GetCommandLineW(), &argumentCount);
+        if (!rawArguments) throw std::runtime_error("Windows could not read the Mission Guard command line.");
+        std::vector<std::wstring> arguments;
+        arguments.reserve(static_cast<std::size_t>(argumentCount));
+        for (int index = 0; index < argumentCount; ++index) arguments.emplace_back(rawArguments[index]);
+        LocalFree(rawArguments);
+
+        if (arguments.size() == 4 && arguments[1] == L"--apply-update") {
+            std::size_t consumed = 0;
+            const unsigned long processId = std::stoul(arguments[3], &consumed, 10);
+            if (consumed != arguments[3].size() || processId > MAXDWORD) throw std::runtime_error("The update process identifier is invalid.");
+            return il2mec::ApplyPendingUpdate(arguments[2], static_cast<DWORD>(processId));
+        }
+        const bool openSettings = std::find(arguments.begin() + (arguments.empty() ? 0 : 1), arguments.end(), L"--settings") != arguments.end();
+        const bool checkUpdates = std::find(arguments.begin() + (arguments.empty() ? 0 : 1), arguments.end(), L"--check-updates") != arguments.end();
         UniqueHandle mutex(CreateMutexW(nullptr, TRUE, kMutexName));
         if (!mutex) return 0;
         if (GetLastError() == ERROR_ALREADY_EXISTS) {
             if (openSettings) {
                 HWND existing = FindWindowExW(HWND_MESSAGE, nullptr, kWindowClass, nullptr);
                 if (existing) PostMessageW(existing, kOpenSettingsMessage, 0, 0);
+            }
+            if (checkUpdates) {
+                HWND existing = FindWindowExW(HWND_MESSAGE, nullptr, kWindowClass, nullptr);
+                if (existing) PostMessageW(existing, kRequestUpdateCheck, 0, 0);
             }
             return 0;
         }
@@ -652,7 +793,7 @@ int WINAPI wWinMain(HINSTANCE instance, HINSTANCE, PWSTR commandLine, int) {
             length = GetEnvironmentVariableW(L"IL2MEC_SETTINGS_FILE", settingsOverride, static_cast<DWORD>(std::size(settingsOverride)));
         }
         fs::path settings = length > 0 && length < std::size(settingsOverride) ? fs::path(settingsOverride) : il2mec::DefaultSettingsPath();
-        TrayApp app(instance, settings, openSettings);
+        TrayApp app(instance, settings, openSettings, checkUpdates);
         return app.Run();
     } catch (const std::exception& error) {
         MessageBoxW(nullptr, il2mec::Utf8ToWide(error.what()).c_str(), L"IL-2 Mission Guard", MB_OK | MB_ICONERROR);

@@ -80,6 +80,34 @@ void TestMissionTitle(const fs::path& root) {
     Require(!il2mec::TryGetSavedMissionPath(L"Editor - <empty>", parsed), "empty mission rejection");
 }
 
+void TestUpdateMetadata() {
+    Require(il2mec::ParseSemanticVersion(L"v1.2.3") == il2mec::SemanticVersion{1, 2, 3}, "semantic version parse");
+    Require(!il2mec::ParseSemanticVersion(L"1.2") && !il2mec::ParseSemanticVersion(L"1.2.3-beta"), "invalid semantic versions rejected");
+    Require(il2mec::IsNewerVersion(L"v2.0.0", L"1.99.99"), "major update comparison");
+    Require(il2mec::IsNewerVersion(L"1.2.1", L"1.2.0") && !il2mec::IsNewerVersion(L"1.2.0", L"1.2.0"), "patch update comparison");
+
+    const std::string json = R"({
+        "tag_name":"v1.2.0",
+        "html_url":"https://github.com/riaanjutte/IL2MissionGuard/releases/tag/v1.2.0",
+        "assets":[{
+            "name":"IL2MissionGuard.exe",
+            "browser_download_url":"https://github.com/riaanjutte/IL2MissionGuard/releases/download/v1.2.0/IL2MissionGuard.exe",
+            "digest":"sha256:d62319688f4f86f4d70a555e794eb5f673fa6ef1fadb6a48780b0d413b171b19"
+        }]
+    })";
+    const auto release = il2mec::ParseGitHubLatestReleaseJson(json);
+    Require(release.version == L"v1.2.0" && release.sha256 == L"d62319688f4f86f4d70a555e794eb5f673fa6ef1fadb6a48780b0d413b171b19", "GitHub release parse");
+
+    bool untrustedRejected = false;
+    try {
+        std::string untrusted = json;
+        const auto position = untrusted.find("https://github.com/riaanjutte/IL2MissionGuard/releases/download/");
+        untrusted.replace(position, std::string("https://github.com/riaanjutte/IL2MissionGuard/releases/download/").size(), "https://example.com/");
+        (void)il2mec::ParseGitHubLatestReleaseJson(untrusted);
+    } catch (...) { untrustedRejected = true; }
+    Require(untrustedRejected, "untrusted update URL rejected");
+}
+
 void TestStabilityAndSnapshots(const fs::path& root) {
     fs::path missions = root / L"Missions";
     fs::path mission = fs::absolute(missions / L"RecoveryTest.Mission");
@@ -141,6 +169,7 @@ int wmain() {
     try {
         TestSettings(root);
         TestMissionTitle(root);
+        TestUpdateMetadata();
         TestStabilityAndSnapshots(root);
         TestLegacyImport(root);
         wchar_t verifyExisting[8]{};
