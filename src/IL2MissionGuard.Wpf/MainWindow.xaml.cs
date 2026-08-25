@@ -67,10 +67,6 @@ public partial class MainWindow : FluentWindow
                 UpdateTitleText.Text = $"Version {release.Version.TrimStart('v', 'V')} is available";
                 UpdateDetailText.Text = "The release can be downloaded, SHA-256 verified, installed, and restarted automatically.";
                 UpdateButton.Content = "Install update";
-                if (!manual)
-                {
-                    ((App)System.Windows.Application.Current).ShowTrayNotification("Mission Guard update available", $"{release.Version} is ready to install.", false);
-                }
             }
         }
         catch (Exception error) when (error is HttpRequestException or IOException or InvalidOperationException or ArgumentException or System.Text.Json.JsonException)
@@ -300,28 +296,18 @@ public partial class MainWindow : FluentWindow
         }
 
         UpdateButton.IsEnabled = false;
-        UpdateTitleText.Text = "Downloading and verifying…";
+        UpdateTitleText.Text = "Continuing in the notification area…";
         try
         {
-            string downloaded = await UpdateService.DownloadVerifiedAsync(availableRelease);
-            UpdateService.LaunchSelfUpdate(downloaded);
+            HostInterop.RequestUpdateCheck();
             ((App)System.Windows.Application.Current).ExitApplication();
         }
-        catch (Exception error) when (error is HttpRequestException or IOException or UnauthorizedAccessException or InvalidOperationException)
+        catch (InvalidOperationException error)
         {
             UpdateTitleText.Text = "Update installation failed";
             UpdateDetailText.Text = error.Message;
             UpdateButton.IsEnabled = true;
-            await ShowMessageAsync("Mission Guard update", "The verified update could not be installed." + Environment.NewLine + Environment.NewLine + error.Message);
-        }
-    }
-
-    private void Window_Closing(object? sender, CancelEventArgs eventArgs)
-    {
-        if (!((App)System.Windows.Application.Current).IsShuttingDown)
-        {
-            eventArgs.Cancel = true;
-            Hide();
+            await ShowMessageAsync("Mission Guard update", "The tray host could not continue the update." + Environment.NewLine + Environment.NewLine + error.Message);
         }
     }
 

@@ -6,7 +6,7 @@
 
 namespace il2mec {
 
-inline constexpr wchar_t kCurrentVersion[] = L"1.4.0";
+inline constexpr wchar_t kCurrentVersion[] = L"2.0.0";
 
 GitHubRelease FetchLatestGitHubRelease();
 std::filesystem::path DownloadVerifiedUpdate(const GitHubRelease& release);

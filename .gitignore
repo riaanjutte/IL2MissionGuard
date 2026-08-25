@@ -2,6 +2,7 @@
 artifacts/
 **/bin/
 **/obj/
+src/IL2MissionGuard/Generated/
 *.user
 *.suo
 *.pdb
@@ -9,4 +10,3 @@ artifacts/
 *.iobj
 *.ipdb
 *.recipe
-

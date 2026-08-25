@@ -637,6 +637,10 @@ std::wstring Sha256File(const fs::path& path) {
     return HashBytes(bytes.data(), bytes.size());
 }
 
+std::wstring Sha256Bytes(const void* data, std::size_t size) {
+    return HashBytes(static_cast<const unsigned char*>(data), size);
+}
+
 std::wstring FormatLocalSnapshotTime(std::chrono::system_clock::time_point value) { return FormatLocal(value, L"%Y-%m-%d_%H-%M-%S"); }
 std::wstring FormatLocalMenuTime(std::chrono::system_clock::time_point value) { return FormatLocal(value, L"%d %b %Y  %H:%M:%S"); }
 

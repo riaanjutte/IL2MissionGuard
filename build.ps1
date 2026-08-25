@@ -27,6 +27,23 @@ if (-not $msbuild) {
     throw 'MSBuild was not found. Install Visual Studio 2022 Build Tools with Desktop development with C++.'
 }
 
+$uiRelease = Join-Path $root 'artifacts\ui\win-x64'
+New-Item -ItemType Directory -Path $uiRelease -Force | Out-Null
+$project = Join-Path $root 'src\IL2MissionGuard.Wpf\IL2MissionGuard.Wpf.csproj'
+& $dotnet publish $project -c $Configuration -r win-x64 --self-contained true -o $uiRelease
+if ($LASTEXITCODE -ne 0) {
+    throw "Managed UI publish failed with exit code $LASTEXITCODE."
+}
+
+$publishedUi = Join-Path $uiRelease 'IL2MissionGuard.exe'
+if (-not (Test-Path -LiteralPath $publishedUi)) {
+    throw 'The managed UI publish did not create IL2MissionGuard.exe.'
+}
+
+$generated = Join-Path $root 'src\IL2MissionGuard\Generated'
+New-Item -ItemType Directory -Path $generated -Force | Out-Null
+Copy-Item -LiteralPath $publishedUi -Destination (Join-Path $generated 'IL2MissionGuard.UI.exe') -Force
+
 & $msbuild (Join-Path $root 'IL2MissionGuard.sln') /m /p:Configuration=$Configuration /p:Platform=x64
 if ($LASTEXITCODE -ne 0) {
     throw "MSBuild failed with exit code $LASTEXITCODE."
@@ -46,11 +63,8 @@ if ($LASTEXITCODE -ne 0) {
 
 $release = Join-Path $root 'artifacts\release\win-x64'
 New-Item -ItemType Directory -Path $release -Force | Out-Null
-$project = Join-Path $root 'src\IL2MissionGuard.Wpf\IL2MissionGuard.Wpf.csproj'
-& $dotnet publish $project -c $Configuration -r win-x64 --self-contained true -o $release
-if ($LASTEXITCODE -ne 0) {
-    throw "Managed publish failed with exit code $LASTEXITCODE."
-}
+$nativeHost = Join-Path $root 'src\IL2MissionGuard\bin\x64\Release\IL2MissionGuard.exe'
+Copy-Item -LiteralPath $nativeHost -Destination (Join-Path $release 'IL2MissionGuard.exe') -Force
 
 $file = Get-Item -LiteralPath (Join-Path $release 'IL2MissionGuard.exe')
 $hash = Get-FileHash -LiteralPath $file.FullName -Algorithm SHA256

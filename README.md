@@ -18,7 +18,8 @@ The application was originally developed as the autosave component of IL2MEC. It
 - Creates a separate safety backup before replacing current mission files.
 - Closes and reopens the matching editor when restoring a mission.
 - Imports legacy recovery points without deleting the old copies.
-- Provides a modern .NET 10/WPF dashboard showing detected editors, open missions, the next and most recent recovery points, stored-point count and the last failure.
+- Keeps editor monitoring, autosave, recovery history, updates, and the tray icon in a lightweight native host.
+- Opens the modern .NET 10/WPF dashboard only on demand and closes that UI process when its window is closed.
 - Includes a structured recovery library, compact settings page, and themed update experience using WPF UI controls.
 - Uses the branded Mission Guard shield in the Windows notification area.
 - Reports the result of every manual recovery-point request instead of silently skipping it.
@@ -115,7 +116,7 @@ Build and test from PowerShell:
 .\build.ps1
 ```
 
-The release build remains a single self-contained executable at `artifacts\release\win-x64\IL2MissionGuard.exe`. The build script runs both the existing native compatibility tests and the managed tests before publishing.
+The release remains a single self-contained executable at `artifacts\release\win-x64\IL2MissionGuard.exe`. It embeds the WPF interface and extracts that interface to the current user's local application-data directory only when a window is opened. The build script runs both the native and managed tests before producing the combined executable.
 
 The managed projects can also be built directly:
 
@@ -124,7 +125,7 @@ dotnet run --project .\tests\IL2MissionGuard.ManagedTests\IL2MissionGuard.Manage
 dotnet publish .\src\IL2MissionGuard.Wpf\IL2MissionGuard.Wpf.csproj -c Release -r win-x64 --self-contained true -o .\artifacts\release\win-x64
 ```
 
-Warnings are treated as errors. The production application targets .NET 10 WPF and uses the WPF UI control library. The C++ project remains in the repository as a compatibility oracle and regression suite during the migration.
+Warnings are treated as errors. The production tray host is native C++; the on-demand interface targets .NET 10 WPF and uses the WPF UI control library.
 
 ## Safety model
 

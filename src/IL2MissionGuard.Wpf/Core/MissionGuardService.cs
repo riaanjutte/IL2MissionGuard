@@ -10,7 +10,8 @@ internal sealed class MissionGuardService : IDisposable
     private readonly ConcurrentDictionary<int, DateTimeOffset> nextSave = new();
     private readonly HashSet<int> protectedProcesses = [];
     private readonly Dictionary<int, string> processIssues = [];
-    private readonly EventWaitHandle stopEvent;
+    private readonly EventWaitHandle? stopEvent;
+    private readonly bool monitorOnly;
     private AutoSaveOptions options;
     private SnapshotStore store;
     private List<EditorProcess> editors = [];
@@ -19,12 +20,16 @@ internal sealed class MissionGuardService : IDisposable
     private int snapshotCount;
     private bool disposed;
 
-    public MissionGuardService()
+    public MissionGuardService(bool monitorOnly = false)
     {
+        this.monitorOnly = monitorOnly;
         Directory.CreateDirectory(SettingsStore.LocalAppDataDirectory);
         options = SettingsStore.Load(SettingsStore.DefaultSettingsPath);
         store = new SnapshotStore(SettingsStore.DefaultSnapshotRoot, options.HistoricSnapshots);
-        stopEvent = new EventWaitHandle(false, EventResetMode.AutoReset, @"Local\IL2MEC.AutoSave.Stop");
+        if (!monitorOnly)
+        {
+            stopEvent = new EventWaitHandle(false, EventResetMode.AutoReset, @"Local\IL2MEC.AutoSave.Stop");
+        }
         try
         {
             int imported = store.ImportLegacySnapshots(SettingsStore.LegacySnapshotRoot);
@@ -38,7 +43,7 @@ internal sealed class MissionGuardService : IDisposable
             AppLog.Write("Could not import legacy autosave files: " + error.Message);
         }
 
-        snapshotCount = store.CountSnapshots();
+        RefreshSnapshotSummary();
 
         timer = new DispatcherTimer(DispatcherPriority.Background)
         {
@@ -185,7 +190,7 @@ internal sealed class MissionGuardService : IDisposable
 
         disposed = true;
         timer.Stop();
-        stopEvent.Dispose();
+        stopEvent?.Dispose();
         operationLock.Dispose();
     }
 
@@ -193,7 +198,7 @@ internal sealed class MissionGuardService : IDisposable
 
     private void Tick()
     {
-        if (stopEvent.WaitOne(0))
+        if (stopEvent?.WaitOne(0) == true)
         {
             System.Windows.Application.Current.Shutdown();
             return;
@@ -215,6 +220,12 @@ internal sealed class MissionGuardService : IDisposable
             processIssues.Remove(id);
         }
 
+        if (monitorOnly)
+        {
+            protectedProcesses.UnionWith(live);
+            RefreshSnapshotSummary();
+        }
+
         DateTimeOffset now = DateTimeOffset.Now;
         foreach (EditorProcess editor in editors)
         {
@@ -222,7 +233,7 @@ internal sealed class MissionGuardService : IDisposable
             {
                 nextSave[editor.Id] = now.AddMinutes(options.IntervalMinutes);
             }
-            else if (options.Enabled && due <= now)
+            else if (!monitorOnly && options.Enabled && due <= now)
             {
                 nextSave[editor.Id] = now.AddMinutes(options.IntervalMinutes);
                 _ = SaveInBackgroundAsync(editor);
@@ -230,6 +241,17 @@ internal sealed class MissionGuardService : IDisposable
         }
 
         RaiseStatusChanged();
+    }
+
+    private void RefreshSnapshotSummary()
+    {
+        snapshotCount = store.CountSnapshots();
+        Snapshot? latest = store.ListSnapshots(null, 1).FirstOrDefault();
+        if (latest is not null && (lastSuccess is null || latest.CreatedUtc > lastSuccess))
+        {
+            lastSuccess = latest.CreatedUtc;
+            lastSuccessMission = Path.GetFileName(latest.MissionPath);
+        }
     }
 
     private async Task SaveInBackgroundAsync(EditorProcess editor)

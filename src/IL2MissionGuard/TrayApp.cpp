@@ -284,6 +284,45 @@ void RevealDialog(HWND dialog) {
     SetForegroundWindow(dialog);
 }
 
+fs::path ExtractWpfUi(HINSTANCE instance) {
+    HRSRC resource = FindResourceW(instance, MAKEINTRESOURCEW(IDR_WPF_UI), RT_RCDATA);
+    if (!resource) throw std::runtime_error("The embedded Mission Guard interface was not found.");
+    HGLOBAL loaded = LoadResource(instance, resource);
+    const DWORD size = SizeofResource(instance, resource);
+    const void* data = loaded ? LockResource(loaded) : nullptr;
+    if (!data || size == 0) throw std::runtime_error("The embedded Mission Guard interface could not be read.");
+
+    const std::wstring digest = il2mec::Sha256Bytes(data, size);
+    const fs::path directory = il2mec::LocalAppDataDirectory() / L"UI" / digest.substr(0, 16);
+    const fs::path executable = directory / L"IL2MissionGuard.UI.exe";
+    if (fs::exists(executable) && fs::file_size(executable) == size) return executable;
+
+    fs::create_directories(directory);
+    const fs::path temporary = executable.wstring() + L".part";
+    {
+        std::ofstream output(temporary, std::ios::binary | std::ios::trunc);
+        if (!output) throw std::runtime_error("The Mission Guard interface could not be extracted.");
+        output.write(static_cast<const char*>(data), size);
+        if (!output) throw std::runtime_error("The Mission Guard interface could not be written completely.");
+    }
+    if (!MoveFileExW(temporary.c_str(), executable.c_str(), MOVEFILE_REPLACE_EXISTING | MOVEFILE_WRITE_THROUGH)) {
+        std::error_code ignored;
+        fs::remove(temporary, ignored);
+        throw std::runtime_error("The Mission Guard interface could not be installed in the user profile.");
+    }
+    return executable;
+}
+
+std::wstring QuoteArgument(const fs::path& value) {
+    std::wstring result = L"\"";
+    for (wchar_t character : value.wstring()) {
+        if (character == L'\"') result += L'\\';
+        result += character;
+    }
+    result += L'\"';
+    return result;
+}
+
 INT_PTR CALLBACK SettingsDialogProcedure(HWND dialog, UINT message, WPARAM wParam, LPARAM lParam) {
     auto* state = reinterpret_cast<SettingsDialogState*>(GetWindowLongPtrW(dialog, DWLP_USER));
     if (message == WM_INITDIALOG) {
@@ -962,20 +1001,7 @@ private:
     }
 
     void ShowStatus() {
-        if (statusDialog_) {
-            RevealDialog(statusDialog_);
-            return;
-        }
-        statusDialog_ = CreateDialogParamW(instance_, MAKEINTRESOURCEW(IDD_STATUS), nullptr,
-                                            StatusDialogProcedure, reinterpret_cast<LPARAM>(&statusDialogState_));
-        if (!statusDialog_) {
-            const std::wstring error = L"Windows could not open the Mission Guard status window.\n\n" + il2mec::Win32ErrorMessage();
-            Log(error);
-            MessageBoxW(nullptr, error.c_str(), L"IL-2 Mission Guard", MB_OK | MB_ICONERROR);
-            return;
-        }
-        UpdateStatus();
-        RevealDialog(statusDialog_);
+        LaunchUi(L"--status");
     }
 
     void Tick() {
@@ -1174,24 +1200,26 @@ private:
     }
 
     void ShowSettings() {
-        if (settingsDialog_) {
-            RevealDialog(settingsDialog_);
-            return;
-        }
-        SettingsDialogState state{options_, settingsPath_, instance_, effectiveDark_, &settingsDialog_, false};
-        const INT_PTR result = DialogBoxParamW(
-            instance_, MAKEINTRESOURCEW(IDD_SETTINGS), nullptr,
-            SettingsDialogProcedure, reinterpret_cast<LPARAM>(&state));
-        settingsDialog_ = nullptr;
-        if (result == -1) {
-            const std::wstring error = L"Windows could not open the settings dialog.\n\n" + il2mec::Win32ErrorMessage();
-            Log(error);
-            MessageBoxW(nullptr, error.c_str(), L"IL-2 Mission Guard", MB_OK | MB_ICONERROR);
-            return;
-        }
-        if (state.saved) {
-            Log(L"Autosave settings were updated from the tray menu.");
-            Tick();
+        LaunchUi(L"--settings");
+    }
+
+    void LaunchUi(const wchar_t* page) {
+        try {
+            const fs::path ui = ExtractWpfUi(instance_);
+            const fs::path host = il2mec::CurrentExecutablePath();
+            const std::wstring arguments = std::wstring(L"--ui-client ") + page + L" --host " + QuoteArgument(host);
+            if (reinterpret_cast<INT_PTR>(ShellExecuteW(nullptr, L"open", ui.c_str(), arguments.c_str(),
+                                                        ui.parent_path().c_str(), SW_SHOWNORMAL)) <= 32) {
+                throw std::runtime_error("Windows could not start the Mission Guard interface.");
+            }
+            // Hashing and extracting the embedded single-file WPF client can page
+            // much of that resource into this otherwise tiny process. Return those
+            // clean pages to Windows as soon as the client has been launched.
+            SetProcessWorkingSetSize(GetCurrentProcess(), static_cast<SIZE_T>(-1), static_cast<SIZE_T>(-1));
+        } catch (const std::exception& error) {
+            const std::wstring detail = il2mec::Utf8ToWide(error.what());
+            Log(L"Could not open the Mission Guard interface: " + detail);
+            MessageBoxW(nullptr, detail.c_str(), L"IL-2 Mission Guard", MB_OK | MB_ICONERROR);
         }
     }
 

@@ -87,6 +87,7 @@ void WaitUntilMissionFamilyStable(
     int requiredStableObservations = 4,
     std::chrono::milliseconds minimumWait = std::chrono::milliseconds(800));
 std::wstring Sha256File(const std::filesystem::path& path);
+std::wstring Sha256Bytes(const void* data, std::size_t size);
 std::wstring FormatLocalSnapshotTime(std::chrono::system_clock::time_point value);
 std::wstring FormatLocalMenuTime(std::chrono::system_clock::time_point value);
 std::optional<SemanticVersion> ParseSemanticVersion(const std::wstring& value);

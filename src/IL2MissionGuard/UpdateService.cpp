@@ -20,7 +20,7 @@ namespace {
 
 constexpr wchar_t kLatestReleaseApi[] = L"https://api.github.com/repos/riaanjutte/IL2MissionGuard/releases/latest";
 constexpr std::size_t kMaximumReleaseResponse = 4 * 1024 * 1024;
-constexpr std::size_t kMaximumExecutableSize = 64 * 1024 * 1024;
+constexpr std::size_t kMaximumExecutableSize = 256 * 1024 * 1024;
 
 struct InternetCloser {
     void operator()(void* value) const { if (value) WinHttpCloseHandle(value); }

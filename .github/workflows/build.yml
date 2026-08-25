@@ -16,15 +16,17 @@ jobs:
 
       - uses: microsoft/setup-msbuild@v3
 
-      - name: Build
-        run: msbuild IL2MissionGuard.sln /m /p:Configuration=Release /p:Platform=x64
+      - uses: actions/setup-dotnet@v5
+        with:
+          dotnet-version: '10.0.x'
 
-      - name: Test
-        run: .\tests\IL2MissionGuard.Tests\bin\IL2MissionGuard.Tests.exe
+      - name: Build
+        shell: pwsh
+        run: .\build.ps1
 
       - name: Upload executable
         uses: actions/upload-artifact@v7
         with:
           name: IL2MissionGuard-win-x64
-          path: src/IL2MissionGuard/bin/x64/Release/IL2MissionGuard.exe
+          path: artifacts/release/win-x64/IL2MissionGuard.exe
           if-no-files-found: error

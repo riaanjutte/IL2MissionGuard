@@ -2,6 +2,7 @@
 
 #define IDI_APP_ICON 101
 #define IDI_TRAY_ICON 102
+#define IDR_WPF_UI 103
 
 #define IDD_SETTINGS 200
 #define IDD_STATUS 201
