@@ -181,6 +181,8 @@ public partial class MainWindow : FluentWindow
 
     private void UpdatesNav_Click(object sender, RoutedEventArgs eventArgs) => ShowPage(UpdatesPage);
 
+    private void CloseWindow_Click(object sender, RoutedEventArgs eventArgs) => Close();
+
     private async void CreateRecovery_Click(object sender, RoutedEventArgs eventArgs)
     {
         if (sender is System.Windows.Controls.Button button)

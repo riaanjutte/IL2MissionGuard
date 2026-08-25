@@ -235,5 +235,17 @@
                 </ui:Card>
             </Grid>
         </Grid>
+
+        <ui:Button Grid.ColumnSpan="2"
+                   Panel.ZIndex="100"
+                   Width="38" Height="38"
+                   Margin="0,12,12,0"
+                   HorizontalAlignment="Right"
+                   VerticalAlignment="Top"
+                   Appearance="Secondary"
+                   Icon="{ui:SymbolIcon Dismiss24}"
+                   ToolTip="Close to the notification area"
+                   AutomationProperties.Name="Close Mission Guard to the notification area"
+                   Click="CloseWindow_Click" />
     </Grid>
 </ui:FluentWindow>
