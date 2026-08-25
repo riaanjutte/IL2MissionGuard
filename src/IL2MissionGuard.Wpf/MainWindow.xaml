@@ -8,6 +8,12 @@
                  Icon="pack://application:,,,/Assets/IL2MissionGuard.ico"
                  WindowBackdropType="None">
     <ui:FluentWindow.Resources>
+        <SolidColorBrush x:Key="ToggleSwitchFillOn" Color="#1565C0" />
+        <SolidColorBrush x:Key="ToggleSwitchFillOnPointerOver" Color="#1976D2" />
+        <SolidColorBrush x:Key="ToggleSwitchFillOnPressed" Color="#0D47A1" />
+        <SolidColorBrush x:Key="ToggleSwitchStrokeOn" Color="#1565C0" />
+        <SolidColorBrush x:Key="ToggleSwitchStrokeOnPointerOver" Color="#1976D2" />
+        <SolidColorBrush x:Key="ToggleSwitchStrokeOnPressed" Color="#0D47A1" />
         <Style x:Key="NavButtonStyle" TargetType="Button" BasedOn="{StaticResource DefaultButtonStyle}">
             <Setter Property="HorizontalContentAlignment" Value="Left" />
             <Setter Property="HorizontalAlignment" Value="Stretch" />
