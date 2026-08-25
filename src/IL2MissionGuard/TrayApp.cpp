@@ -5,6 +5,8 @@
 #include <shellapi.h>
 #include <tlhelp32.h>
 #include <dwmapi.h>
+#include <objidl.h>
+#include <gdiplus.h>
 #include <uxtheme.h>
 
 #include <algorithm>
@@ -21,6 +23,7 @@
 #include <vector>
 
 #pragma comment(lib, "dwmapi.lib")
+#pragma comment(lib, "gdiplus.lib")
 #pragma comment(lib, "uxtheme.lib")
 
 namespace fs = std::filesystem;
@@ -105,6 +108,21 @@ HBRUSH gDarkControlBrush = nullptr;
 constexpr wchar_t kToggleOriginalProcedure[] = L"IL2MissionGuard.ToggleOriginalProcedure";
 constexpr wchar_t kToggleDarkMode[] = L"IL2MissionGuard.ToggleDarkMode";
 
+class GdiPlusSession {
+public:
+    GdiPlusSession() {
+        Gdiplus::GdiplusStartupInput input;
+        if (Gdiplus::GdiplusStartup(&token_, &input, nullptr) != Gdiplus::Ok)
+            throw std::runtime_error("Windows could not initialize smooth UI rendering.");
+    }
+    ~GdiPlusSession() { if (token_) Gdiplus::GdiplusShutdown(token_); }
+    GdiPlusSession(const GdiPlusSession&) = delete;
+    GdiPlusSession& operator=(const GdiPlusSession&) = delete;
+
+private:
+    ULONG_PTR token_ = 0;
+};
+
 bool SystemUsesDarkTheme() {
     DWORD value = 1;
     DWORD size = sizeof(value);
@@ -136,33 +154,29 @@ void PaintToggle(HWND control, HDC device) {
     const bool checked = SendMessageW(control, BM_GETCHECK, 0, 0) == BST_CHECKED;
     const bool enabled = IsWindowEnabled(control) != FALSE;
     FillRect(device, &bounds, dark ? gDarkBackgroundBrush : GetSysColorBrush(COLOR_3DFACE));
-    RECT track = bounds;
-    InflateRect(&track, -1, -2);
-    const int radius = (track.bottom - track.top) / 2;
+    Gdiplus::Graphics graphics(device);
+    graphics.SetSmoothingMode(Gdiplus::SmoothingModeAntiAlias);
+    graphics.SetPixelOffsetMode(Gdiplus::PixelOffsetModeHighQuality);
+    const Gdiplus::REAL trackX = 1.5f;
+    const Gdiplus::REAL trackY = 2.5f;
+    const Gdiplus::REAL trackWidth = static_cast<Gdiplus::REAL>(bounds.right - bounds.left) - 3.0f;
+    const Gdiplus::REAL trackHeight = static_cast<Gdiplus::REAL>(bounds.bottom - bounds.top) - 5.0f;
     const COLORREF trackColor = !enabled ? (dark ? RGB(63, 67, 73) : RGB(195, 195, 195))
         : checked ? RGB(53, 132, 228) : dark ? RGB(91, 98, 108) : RGB(145, 151, 159);
-    HBRUSH trackBrush = CreateSolidBrush(trackColor);
-    HPEN trackPen = CreatePen(PS_SOLID, 1, trackColor);
-    HGDIOBJ previousBrush = SelectObject(device, trackBrush);
-    HGDIOBJ previousPen = SelectObject(device, trackPen);
-    RoundRect(device, track.left, track.top, track.right, track.bottom, radius * 2, radius * 2);
-    SelectObject(device, previousBrush);
-    SelectObject(device, previousPen);
-    DeleteObject(trackBrush);
-    DeleteObject(trackPen);
-    const int diameter = (track.bottom - track.top) - 4;
-    const int knobLeft = checked ? track.right - diameter - 2 : track.left + 2;
-    RECT knob{knobLeft, track.top + 2, knobLeft + diameter, track.top + 2 + diameter};
+    Gdiplus::GraphicsPath trackPath;
+    trackPath.AddArc(trackX, trackY, trackHeight, trackHeight, 90.0f, 180.0f);
+    trackPath.AddArc(trackX + trackWidth - trackHeight, trackY, trackHeight, trackHeight, 270.0f, 180.0f);
+    trackPath.CloseFigure();
+    Gdiplus::SolidBrush trackBrush(Gdiplus::Color(255, GetRValue(trackColor), GetGValue(trackColor), GetBValue(trackColor)));
+    graphics.FillPath(&trackBrush, &trackPath);
+    const Gdiplus::REAL diameter = trackHeight - 4.0f;
+    const Gdiplus::REAL knobLeft = checked ? trackX + trackWidth - diameter - 2.0f : trackX + 2.0f;
+    const Gdiplus::REAL knobTop = trackY + 2.0f;
     const COLORREF knobColor = enabled ? RGB(250, 250, 250) : RGB(165, 165, 165);
-    HBRUSH knobBrush = CreateSolidBrush(knobColor);
-    HPEN knobPen = CreatePen(PS_SOLID, 1, knobColor);
-    previousBrush = SelectObject(device, knobBrush);
-    previousPen = SelectObject(device, knobPen);
-    Ellipse(device, knob.left, knob.top, knob.right, knob.bottom);
-    SelectObject(device, previousBrush);
-    SelectObject(device, previousPen);
-    DeleteObject(knobBrush);
-    DeleteObject(knobPen);
+    Gdiplus::SolidBrush shadow(Gdiplus::Color(dark ? 70 : 45, 0, 0, 0));
+    graphics.FillEllipse(&shadow, knobLeft, knobTop + 1.0f, diameter, diameter);
+    Gdiplus::SolidBrush knobBrush(Gdiplus::Color(255, GetRValue(knobColor), GetGValue(knobColor), GetBValue(knobColor)));
+    graphics.FillEllipse(&knobBrush, knobLeft, knobTop, diameter, diameter);
     if (GetFocus() == control) {
         RECT focus = bounds;
         InflateRect(&focus, -1, -1);
@@ -753,6 +767,9 @@ public:
     }
 
 private:
+    // Keep GDI+ alive for the lifetime of every settings window so the custom
+    // switches can be drawn with anti-aliased curves.
+    GdiPlusSession gdiPlus_;
     HINSTANCE instance_{};
     HWND window_{};
     fs::path settingsPath_;
