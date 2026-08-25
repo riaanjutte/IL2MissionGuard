@@ -8,8 +8,8 @@ namespace IL2MissionGuard.Core;
 
 internal static class UpdateService
 {
-    public const string CurrentVersion = "2.0.0";
-    private const string LatestReleaseApi = "https://api.github.com/repos/riaanjutte/IL2MissionGuard/releases/latest";
+    public const string CurrentVersion = "0.1.0-beta.1";
+    private const string LatestReleaseApi = "https://api.github.com/repos/riaanjutte/IL2MissionGuard/releases?per_page=20";
     private const string ReleasePrefix = "https://github.com/riaanjutte/IL2MissionGuard/releases/";
     private const string AssetPrefix = "https://github.com/riaanjutte/IL2MissionGuard/releases/download/";
     private const int MaximumReleaseBytes = 4 * 1024 * 1024;
@@ -17,24 +17,75 @@ internal static class UpdateService
 
     public static bool IsNewerVersion(string candidate, string current)
     {
-        Version left = ParseVersion(candidate);
-        Version right = ParseVersion(current);
-        return left > right;
+        SemanticVersion left = ParseVersion(candidate);
+        SemanticVersion right = ParseVersion(current);
+        int coreComparison = left.Major != right.Major ? left.Major.CompareTo(right.Major)
+            : left.Minor != right.Minor ? left.Minor.CompareTo(right.Minor)
+            : left.Patch.CompareTo(right.Patch);
+        if (coreComparison != 0)
+        {
+            return coreComparison > 0;
+        }
+
+        if (left.Prerelease.Length == 0 || right.Prerelease.Length == 0)
+        {
+            return left.Prerelease.Length == 0 && right.Prerelease.Length != 0;
+        }
+
+        int identifiers = Math.Min(left.Prerelease.Length, right.Prerelease.Length);
+        for (int index = 0; index < identifiers; index++)
+        {
+            string leftPart = left.Prerelease[index];
+            string rightPart = right.Prerelease[index];
+            bool leftNumeric = leftPart.All(char.IsAsciiDigit);
+            bool rightNumeric = rightPart.All(char.IsAsciiDigit);
+            if (leftNumeric != rightNumeric)
+            {
+                return !leftNumeric;
+            }
+
+            int comparison = leftNumeric && leftPart.Length != rightPart.Length
+                ? leftPart.Length.CompareTo(rightPart.Length)
+                : string.CompareOrdinal(leftPart, rightPart);
+            if (comparison != 0)
+            {
+                return comparison > 0;
+            }
+        }
+
+        return left.Prerelease.Length > right.Prerelease.Length;
     }
 
     public static GitHubRelease ParseLatestRelease(string json)
     {
         using JsonDocument document = JsonDocument.Parse(json);
         JsonElement root = document.RootElement;
-        string version = root.GetProperty("tag_name").GetString() ?? throw new InvalidOperationException("The latest GitHub release has no version tag.");
+        JsonElement releaseJson = root;
+        if (root.ValueKind == JsonValueKind.Array)
+        {
+            JsonElement.ArrayEnumerator releases = root.EnumerateArray();
+            if (!releases.MoveNext())
+            {
+                throw new InvalidOperationException("GitHub has no published releases.");
+            }
+
+            releaseJson = releases.Current;
+        }
+
+        if (releaseJson.ValueKind != JsonValueKind.Object)
+        {
+            throw new InvalidOperationException("The GitHub release response is not an object.");
+        }
+
+        string version = releaseJson.GetProperty("tag_name").GetString() ?? throw new InvalidOperationException("The latest GitHub release has no version tag.");
         _ = ParseVersion(version);
-        string releaseUrl = root.GetProperty("html_url").GetString() ?? string.Empty;
+        string releaseUrl = releaseJson.GetProperty("html_url").GetString() ?? string.Empty;
         if (!releaseUrl.StartsWith(ReleasePrefix, StringComparison.OrdinalIgnoreCase))
         {
             throw new InvalidOperationException("The GitHub release URL is not trusted.");
         }
 
-        foreach (JsonElement asset in root.GetProperty("assets").EnumerateArray())
+        foreach (JsonElement asset in releaseJson.GetProperty("assets").EnumerateArray())
         {
             if (!string.Equals(asset.GetProperty("name").GetString(), "IL2MissionGuard.exe", StringComparison.Ordinal))
             {
@@ -237,10 +288,27 @@ internal static class UpdateService
         return output.ToArray();
     }
 
-    private static Version ParseVersion(string value) =>
-        Version.TryParse(value.Trim().TrimStart('v', 'V'), out Version? version) && version.Build >= 0
-            ? version
-            : throw new ArgumentException("A release version is not valid semantic version text.", nameof(value));
+    private static SemanticVersion ParseVersion(string value)
+    {
+        string text = value.Trim().TrimStart('v', 'V');
+        string[] versionAndPrerelease = text.Split('-', 2);
+        string[] core = versionAndPrerelease[0].Split('.');
+        if (core.Length != 3 || core.Any(part => !int.TryParse(part, out _) || (part.Length > 1 && part[0] == '0')))
+        {
+            throw new ArgumentException("A release version is not valid semantic version text.", nameof(value));
+        }
+
+        string[] prerelease = versionAndPrerelease.Length == 1 ? [] : versionAndPrerelease[1].Split('.');
+        if (prerelease.Any(part => part.Length == 0 || part.Any(character => !char.IsAsciiLetterOrDigit(character) && character != '-') ||
+                                   (part.Length > 1 && part[0] == '0' && part.All(char.IsAsciiDigit))))
+        {
+            throw new ArgumentException("A release version is not valid semantic version text.", nameof(value));
+        }
+
+        return new SemanticVersion(int.Parse(core[0]), int.Parse(core[1]), int.Parse(core[2]), prerelease);
+    }
+
+    private sealed record SemanticVersion(int Major, int Minor, int Patch, string[] Prerelease);
 
     private static bool IsSha256(string value) => value.Length == 64 && value.All(Uri.IsHexDigit);
 

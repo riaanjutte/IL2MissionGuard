@@ -527,6 +527,29 @@ void SaveAutoSaveOptions(const fs::path& settingsValue, const AutoSaveOptions& o
 std::optional<SemanticVersion> ParseSemanticVersion(const std::wstring& input) {
     std::wstring value = Trim(input);
     if (!value.empty() && (value.front() == L'v' || value.front() == L'V')) value.erase(value.begin());
+    const std::size_t prereleaseSeparator = value.find(L'-');
+    std::wstring prerelease;
+    if (prereleaseSeparator != std::wstring::npos) {
+        prerelease = value.substr(prereleaseSeparator + 1);
+        value.resize(prereleaseSeparator);
+        if (prerelease.empty()) return std::nullopt;
+        std::size_t identifierStart = 0;
+        while (identifierStart < prerelease.size()) {
+            const std::size_t identifierEnd = prerelease.find(L'.', identifierStart);
+            const std::wstring identifier = prerelease.substr(
+                identifierStart, identifierEnd == std::wstring::npos ? identifierEnd : identifierEnd - identifierStart);
+            if (identifier.empty() || !std::all_of(identifier.begin(), identifier.end(), [](wchar_t c) {
+                    return (c >= L'0' && c <= L'9') || (c >= L'A' && c <= L'Z') ||
+                           (c >= L'a' && c <= L'z') || c == L'-';
+                })) return std::nullopt;
+            if (identifier.size() > 1 && identifier.front() == L'0' &&
+                std::all_of(identifier.begin(), identifier.end(), [](wchar_t c) { return c >= L'0' && c <= L'9'; }))
+                return std::nullopt;
+            if (identifierEnd == std::wstring::npos) break;
+            if (identifierEnd + 1 == prerelease.size()) return std::nullopt;
+            identifierStart = identifierEnd + 1;
+        }
+    }
     SemanticVersion result;
     int* parts[] = {&result.major, &result.minor, &result.patch};
     std::size_t start = 0;
@@ -534,7 +557,8 @@ std::optional<SemanticVersion> ParseSemanticVersion(const std::wstring& input) {
         const std::size_t end = value.find(L'.', start);
         if ((index < 2 && end == std::wstring::npos) || (index == 2 && end != std::wstring::npos)) return std::nullopt;
         const std::wstring piece = value.substr(start, end == std::wstring::npos ? end : end - start);
-        if (piece.empty() || !std::all_of(piece.begin(), piece.end(), [](wchar_t c) { return c >= L'0' && c <= L'9'; })) return std::nullopt;
+        if (piece.empty() || (piece.size() > 1 && piece.front() == L'0') ||
+            !std::all_of(piece.begin(), piece.end(), [](wchar_t c) { return c >= L'0' && c <= L'9'; })) return std::nullopt;
         try {
             std::size_t consumed = 0;
             const long parsed = std::stol(piece, &consumed, 10);
@@ -543,6 +567,7 @@ std::optional<SemanticVersion> ParseSemanticVersion(const std::wstring& input) {
         } catch (...) { return std::nullopt; }
         start = end == std::wstring::npos ? value.size() : end + 1;
     }
+    result.prerelease = std::move(prerelease);
     return result;
 }
 
@@ -552,22 +577,51 @@ bool IsNewerVersion(const std::wstring& candidate, const std::wstring& current) 
     if (!left || !right) throw std::invalid_argument("A release version is not valid semantic version text.");
     if (left->major != right->major) return left->major > right->major;
     if (left->minor != right->minor) return left->minor > right->minor;
-    return left->patch > right->patch;
+    if (left->patch != right->patch) return left->patch > right->patch;
+    if (left->prerelease.empty() != right->prerelease.empty()) return left->prerelease.empty();
+    if (left->prerelease.empty()) return false;
+
+    std::size_t leftStart = 0, rightStart = 0;
+    for (;;) {
+        const std::size_t leftEnd = left->prerelease.find(L'.', leftStart);
+        const std::size_t rightEnd = right->prerelease.find(L'.', rightStart);
+        const std::wstring leftPart = left->prerelease.substr(leftStart, leftEnd == std::wstring::npos ? leftEnd : leftEnd - leftStart);
+        const std::wstring rightPart = right->prerelease.substr(rightStart, rightEnd == std::wstring::npos ? rightEnd : rightEnd - rightStart);
+        const bool leftNumeric = std::all_of(leftPart.begin(), leftPart.end(), [](wchar_t c) { return c >= L'0' && c <= L'9'; });
+        const bool rightNumeric = std::all_of(rightPart.begin(), rightPart.end(), [](wchar_t c) { return c >= L'0' && c <= L'9'; });
+        if (leftNumeric != rightNumeric) return !leftNumeric;
+        if (leftPart != rightPart) {
+            if (leftNumeric) {
+                if (leftPart.size() != rightPart.size()) return leftPart.size() > rightPart.size();
+            }
+            return leftPart > rightPart;
+        }
+        if (leftEnd == std::wstring::npos || rightEnd == std::wstring::npos)
+            return leftEnd != std::wstring::npos;
+        leftStart = leftEnd + 1;
+        rightStart = rightEnd + 1;
+    }
 }
 
 GitHubRelease ParseGitHubLatestReleaseJson(const std::string& json) {
     const auto root = JsonParser(json).Parse();
-    if (root.type != JsonParser::Value::Type::Object) throw std::runtime_error("The GitHub release response is not an object.");
+    const JsonParser::Value* releaseJson = &root;
+    if (root.type == JsonParser::Value::Type::Array) {
+        if (root.array.empty()) throw std::runtime_error("GitHub has no published releases.");
+        releaseJson = &root.array.front();
+    }
+    if (releaseJson->type != JsonParser::Value::Type::Object)
+        throw std::runtime_error("The GitHub release response is not an object.");
     GitHubRelease release;
-    release.version = Utf8ToWide(Member(root, "tag_name", JsonParser::Value::Type::String).string);
-    release.releaseUrl = Utf8ToWide(Member(root, "html_url", JsonParser::Value::Type::String).string);
+    release.version = Utf8ToWide(Member(*releaseJson, "tag_name", JsonParser::Value::Type::String).string);
+    release.releaseUrl = Utf8ToWide(Member(*releaseJson, "html_url", JsonParser::Value::Type::String).string);
     if (!ParseSemanticVersion(release.version)) throw std::runtime_error("The latest GitHub release has an invalid version tag.");
 
     constexpr wchar_t releasePrefix[] = L"https://github.com/riaanjutte/IL2MissionGuard/releases/";
     constexpr wchar_t assetPrefix[] = L"https://github.com/riaanjutte/IL2MissionGuard/releases/download/";
     if (!HasPrefix(release.releaseUrl, releasePrefix)) throw std::runtime_error("The GitHub release URL is not trusted.");
 
-    const auto& assets = Member(root, "assets", JsonParser::Value::Type::Array);
+    const auto& assets = Member(*releaseJson, "assets", JsonParser::Value::Type::Array);
     for (const auto& asset : assets.array) {
         if (asset.type != JsonParser::Value::Type::Object) continue;
         const auto name = asset.object.find("name");

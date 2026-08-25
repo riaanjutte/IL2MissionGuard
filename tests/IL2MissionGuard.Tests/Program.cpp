@@ -88,21 +88,26 @@ void TestMissionTitle(const fs::path& root) {
 
 void TestUpdateMetadata() {
     Require(il2mec::ParseSemanticVersion(L"v1.2.3") == il2mec::SemanticVersion{1, 2, 3}, "semantic version parse");
-    Require(!il2mec::ParseSemanticVersion(L"1.2") && !il2mec::ParseSemanticVersion(L"1.2.3-beta"), "invalid semantic versions rejected");
+    Require(il2mec::ParseSemanticVersion(L"v0.1.0-beta.1") == il2mec::SemanticVersion{0, 1, 0, L"beta.1"}, "prerelease version parse");
+    Require(!il2mec::ParseSemanticVersion(L"1.2") && !il2mec::ParseSemanticVersion(L"1.2.3-beta..1") &&
+            !il2mec::ParseSemanticVersion(L"1.2.3-beta.") && !il2mec::ParseSemanticVersion(L"01.2.3"), "invalid semantic versions rejected");
     Require(il2mec::IsNewerVersion(L"v2.0.0", L"1.99.99"), "major update comparison");
     Require(il2mec::IsNewerVersion(L"1.2.1", L"1.2.0") && !il2mec::IsNewerVersion(L"1.2.0", L"1.2.0"), "patch update comparison");
+    Require(il2mec::IsNewerVersion(L"0.1.0-beta.2", L"0.1.0-beta.1") &&
+            il2mec::IsNewerVersion(L"0.1.0", L"0.1.0-beta.2") &&
+            !il2mec::IsNewerVersion(L"0.1.0-alpha.1", L"0.1.0-beta.1"), "prerelease update comparison");
 
-    const std::string json = R"({
-        "tag_name":"v1.2.0",
-        "html_url":"https://github.com/riaanjutte/IL2MissionGuard/releases/tag/v1.2.0",
+    const std::string json = R"([{
+        "tag_name":"v0.1.0-beta.2",
+        "html_url":"https://github.com/riaanjutte/IL2MissionGuard/releases/tag/v0.1.0-beta.2",
         "assets":[{
             "name":"IL2MissionGuard.exe",
-            "browser_download_url":"https://github.com/riaanjutte/IL2MissionGuard/releases/download/v1.2.0/IL2MissionGuard.exe",
+            "browser_download_url":"https://github.com/riaanjutte/IL2MissionGuard/releases/download/v0.1.0-beta.2/IL2MissionGuard.exe",
             "digest":"sha256:d62319688f4f86f4d70a555e794eb5f673fa6ef1fadb6a48780b0d413b171b19"
         }]
-    })";
+    }])";
     const auto release = il2mec::ParseGitHubLatestReleaseJson(json);
-    Require(release.version == L"v1.2.0" && release.sha256 == L"d62319688f4f86f4d70a555e794eb5f673fa6ef1fadb6a48780b0d413b171b19", "GitHub release parse");
+    Require(release.version == L"v0.1.0-beta.2" && release.sha256 == L"d62319688f4f86f4d70a555e794eb5f673fa6ef1fadb6a48780b0d413b171b19", "GitHub release parse");
 
     bool untrustedRejected = false;
     try {

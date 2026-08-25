@@ -84,7 +84,7 @@ For isolated testing, set `IL2MISSIONGUARD_SETTINGS_FILE` to an alternative INI 
 
 ## Updates
 
-Mission Guard checks the repository's latest stable GitHub release after startup. The check runs in the background. When a newer version is available, a tray notification and an **Install update** menu item appear. You can also choose **Check for updates...** at any time.
+Mission Guard checks the repository's newest published GitHub release, including prereleases, after startup. The check runs in the background. When a newer version is available, a tray notification and an **Install update** menu item appear. You can also choose **Check for updates...** at any time.
 
 `IL2MissionGuard.exe --check-updates` opens the same manual update check in a running tray process.
 

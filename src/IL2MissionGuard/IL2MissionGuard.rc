@@ -50,7 +50,7 @@ BEGIN
     LTEXT           "0", IDC_STATUS_COUNT, 126, 165, 60, 10
     LTEXT           "Last issue:", IDC_STATIC, 10, 191, 52, 10
     LTEXT           "None", IDC_STATUS_ISSUE, 66, 191, 224, 23
-    LTEXT           "v1.4.0", IDC_STATUS_VERSION, 305, 195, 50, 10, SS_RIGHT
+    LTEXT           "v0.1.0-beta.1", IDC_STATUS_VERSION, 280, 195, 75, 10, SS_RIGHT
     PUSHBUTTON      "Create recovery point now", IDC_STATUS_SAVE_NOW, 10, 209, 128, 16, WS_TABSTOP
     PUSHBUTTON      "Open recovery folder", IDC_STATUS_FOLDER, 143, 209, 102, 16, WS_TABSTOP
     DEFPUSHBUTTON   "Close", IDCANCEL, 310, 209, 50, 16, WS_TABSTOP
@@ -67,8 +67,8 @@ BEGIN
 END
 
 VS_VERSION_INFO VERSIONINFO
- FILEVERSION 2,0,0,0
- PRODUCTVERSION 2,0,0,0
+ FILEVERSION 0,1,0,1
+ PRODUCTVERSION 0,1,0,1
  FILEFLAGSMASK 0x3fL
 #ifdef _DEBUG
  FILEFLAGS 0x1L
@@ -85,11 +85,11 @@ BEGIN
     BEGIN
       VALUE "CompanyName", "IL2MissionGuard contributors"
       VALUE "FileDescription", "IL-2 Mission Guard"
-      VALUE "FileVersion", "2.0.0"
+      VALUE "FileVersion", "0.1.0.1"
       VALUE "InternalName", "IL2MissionGuard"
       VALUE "OriginalFilename", "IL2MissionGuard.exe"
       VALUE "ProductName", "IL-2 Mission Guard"
-      VALUE "ProductVersion", "2.0.0"
+      VALUE "ProductVersion", "0.1.0-beta.1"
     END
   END
   BLOCK "VarFileInfo"

@@ -54,6 +54,7 @@ struct SemanticVersion {
     int major = 0;
     int minor = 0;
     int patch = 0;
+    std::wstring prerelease;
 
     bool operator==(const SemanticVersion&) const = default;
 };

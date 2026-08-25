@@ -51,19 +51,22 @@ static void TestMissionTitle(string root)
 static void TestUpdateMetadata()
 {
     Require(UpdateService.IsNewerVersion("v2.0.0", "1.99.99"), "version comparison");
+    Require(UpdateService.IsNewerVersion("v0.1.0-beta.2", "0.1.0-beta.1") &&
+            UpdateService.IsNewerVersion("0.1.0", "0.1.0-beta.2") &&
+            !UpdateService.IsNewerVersion("0.1.0-alpha.1", "0.1.0-beta.1"), "prerelease version comparison");
     string json = """
-        {
-          "tag_name":"v2.1.0",
-          "html_url":"https://github.com/riaanjutte/IL2MissionGuard/releases/tag/v2.1.0",
+        [{
+          "tag_name":"v0.1.0-beta.2",
+          "html_url":"https://github.com/riaanjutte/IL2MissionGuard/releases/tag/v0.1.0-beta.2",
           "assets":[{
             "name":"IL2MissionGuard.exe",
-            "browser_download_url":"https://github.com/riaanjutte/IL2MissionGuard/releases/download/v2.1.0/IL2MissionGuard.exe",
+            "browser_download_url":"https://github.com/riaanjutte/IL2MissionGuard/releases/download/v0.1.0-beta.2/IL2MissionGuard.exe",
             "digest":"sha256:d62319688f4f86f4d70a555e794eb5f673fa6ef1fadb6a48780b0d413b171b19"
           }]
-        }
+        }]
         """;
     GitHubRelease release = UpdateService.ParseLatestRelease(json);
-    Require(release.Version == "v2.1.0" && release.Sha256.Length == 64, "release metadata parse");
+    Require(release.Version == "v0.1.0-beta.2" && release.Sha256.Length == 64, "release metadata parse");
     bool rejected = false;
     try
     {
