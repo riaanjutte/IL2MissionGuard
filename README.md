@@ -27,6 +27,16 @@ It asks the editor to run its normal **File > Save** command at a configurable i
 - Downloads only the expected release executable and verifies GitHub's published SHA-256 digest before installation.
 - Ships as one self-contained x64 executable; users do not need to install .NET separately.
 
+## Screenshots
+
+| Overview | Recovery points |
+| --- | --- |
+| ![IL-2 Mission Guard overview showing active Great Battles protection](docs/images/overview.png) | ![Recovery-point library with verified Great Battles snapshots](docs/images/recovery-points.png) |
+
+| Settings | Updates |
+| --- | --- |
+| ![Autosave, retention, notification, editor, and theme settings](docs/images/settings.png) | ![Built-in GitHub update checker](docs/images/updates.png) |
+
 ## Using Mission Guard
 
 Run `IL2MissionGuard.exe`. Its Mission Guard icon appears in the Windows notification area.
