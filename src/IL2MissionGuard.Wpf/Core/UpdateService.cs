@@ -1,6 +1,7 @@
 using System.Diagnostics;
 using System.Net.Http;
 using System.Net.Http.Headers;
+using System.Reflection;
 using System.Security.Cryptography;
 using System.Text.Json;
 
@@ -8,7 +9,7 @@ namespace IL2MissionGuard.Core;
 
 internal static class UpdateService
 {
-    public const string CurrentVersion = "0.1.0-beta.1";
+    public static string CurrentVersion { get; } = GetApplicationVersion();
     private const string LatestReleaseApi = "https://api.github.com/repos/riaanjutte/IL2MissionGuard/releases?per_page=20";
     private const string ReleasePrefix = "https://github.com/riaanjutte/IL2MissionGuard/releases/";
     private const string AssetPrefix = "https://github.com/riaanjutte/IL2MissionGuard/releases/download/";
@@ -309,6 +310,18 @@ internal static class UpdateService
     }
 
     private sealed record SemanticVersion(int Major, int Minor, int Patch, string[] Prerelease);
+
+    private static string GetApplicationVersion()
+    {
+        Assembly assembly = typeof(UpdateService).Assembly;
+        string? informational = assembly.GetCustomAttribute<AssemblyInformationalVersionAttribute>()?.InformationalVersion;
+        if (!string.IsNullOrWhiteSpace(informational))
+        {
+            return informational.Split('+', 2)[0];
+        }
+
+        return assembly.GetName().Version?.ToString(3) ?? "0.0.0";
+    }
 
     private static bool IsSha256(string value) => value.Length == 64 && value.All(Uri.IsHexDigit);
 
