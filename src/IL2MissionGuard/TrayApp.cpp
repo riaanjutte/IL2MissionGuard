@@ -38,6 +38,7 @@ constexpr UINT kUpdateWorkerComplete = WM_APP + 3;
 constexpr UINT kRequestUpdateCheck = WM_APP + 4;
 constexpr UINT kStatusWindowClosed = WM_APP + 5;
 constexpr UINT kOpenStatusMessage = WM_APP + 6;
+constexpr UINT kRevealDialogMessage = WM_APP + 20;
 constexpr UINT kTimerId = 1;
 constexpr UINT kSaveCommandId = 0x8037;
 constexpr UINT kMenuSave = 1001;
@@ -67,6 +68,7 @@ struct SettingsDialogState {
     fs::path settingsPath;
     HINSTANCE instance = nullptr;
     bool dark = false;
+    HWND* openDialog = nullptr;
     bool saved = false;
 };
 
@@ -338,11 +340,25 @@ void CenterDialog(HWND dialog) {
     SetWindowPos(dialog, nullptr, x, y, 0, 0, SWP_NOACTIVATE | SWP_NOSIZE | SWP_NOZORDER);
 }
 
+void RevealDialog(HWND dialog) {
+    if (!dialog) return;
+    // The tray agent is launched with STARTF_USESHOWWINDOW/SW_HIDE. Windows
+    // consumes the first ShowWindow request for the process and substitutes
+    // that startup value, so deliberately consume it before forcing the
+    // requested dialog visible.
+    ShowWindow(dialog, SW_SHOWNORMAL);
+    SetWindowPos(dialog, HWND_TOP, 0, 0, 0, 0,
+                 SWP_NOMOVE | SWP_NOSIZE | SWP_SHOWWINDOW);
+    ShowWindow(dialog, SW_SHOWNORMAL);
+    SetForegroundWindow(dialog);
+}
+
 INT_PTR CALLBACK SettingsDialogProcedure(HWND dialog, UINT message, WPARAM wParam, LPARAM lParam) {
     auto* state = reinterpret_cast<SettingsDialogState*>(GetWindowLongPtrW(dialog, DWLP_USER));
     if (message == WM_INITDIALOG) {
         state = reinterpret_cast<SettingsDialogState*>(lParam);
         SetWindowLongPtrW(dialog, DWLP_USER, reinterpret_cast<LONG_PTR>(state));
+        if (state->openDialog) *state->openDialog = dialog;
         SendMessageW(dialog, WM_SETICON, ICON_SMALL,
                      reinterpret_cast<LPARAM>(LoadIconW(state->instance, MAKEINTRESOURCEW(IDI_APP_ICON))));
         CheckDlgButton(dialog, IDC_GREAT_BATTLES, state->options.enabled && state->options.greatBattles ? BST_CHECKED : BST_UNCHECKED);
@@ -359,9 +375,19 @@ INT_PTR CALLBACK SettingsDialogProcedure(HWND dialog, UINT message, WPARAM wPara
         SendMessageW(theme, CB_SETCURSEL, themeIndex, 0);
         ApplyWindowTheme(dialog, state->dark);
         CenterDialog(dialog);
+        PostMessageW(dialog, kRevealDialogMessage, 0, 0);
         return TRUE;
     }
     if (!state) return FALSE;
+
+    if (message == kRevealDialogMessage) {
+        RevealDialog(dialog);
+        return TRUE;
+    }
+    if (message == WM_DESTROY) {
+        if (state->openDialog && *state->openDialog == dialog) *state->openDialog = nullptr;
+        return TRUE;
+    }
 
     if (message == WM_CTLCOLORDLG || message == WM_CTLCOLORSTATIC || message == WM_CTLCOLORBTN ||
         message == WM_CTLCOLOREDIT || message == WM_CTLCOLORLISTBOX) {
@@ -420,9 +446,14 @@ INT_PTR CALLBACK StatusDialogProcedure(HWND dialog, UINT message, WPARAM wParam,
                      reinterpret_cast<LPARAM>(LoadIconW(state->instance, MAKEINTRESOURCEW(IDI_APP_ICON))));
         ApplyWindowTheme(dialog, state->dark);
         CenterDialog(dialog);
+        PostMessageW(dialog, kRevealDialogMessage, 0, 0);
         return TRUE;
     }
     if (!state) return FALSE;
+    if (message == kRevealDialogMessage) {
+        RevealDialog(dialog);
+        return TRUE;
+    }
     if (message == WM_CTLCOLORDLG || message == WM_CTLCOLORSTATIC || message == WM_CTLCOLORBTN ||
         message == WM_CTLCOLOREDIT || message == WM_CTLCOLORLISTBOX) {
         return ThemeControlColor(state->dark, message, wParam, lParam, false, state->protectionState);
@@ -732,6 +763,7 @@ private:
     HICON baseTrayIcon_{};
     HICON statusTrayIcon_{};
     ProtectionState protectionState_ = ProtectionState::Disabled;
+    HWND settingsDialog_{};
     HWND statusDialog_{};
     StatusDialogState statusDialogState_{};
     std::map<DWORD, std::chrono::steady_clock::time_point> nextSave_;
@@ -946,8 +978,7 @@ private:
 
     void ShowStatus() {
         if (statusDialog_) {
-            ShowWindow(statusDialog_, SW_SHOWNORMAL);
-            SetForegroundWindow(statusDialog_);
+            RevealDialog(statusDialog_);
             return;
         }
         statusDialog_ = CreateDialogParamW(instance_, MAKEINTRESOURCEW(IDD_STATUS), nullptr,
@@ -959,8 +990,7 @@ private:
             return;
         }
         UpdateStatus();
-        ShowWindow(statusDialog_, SW_SHOWNORMAL);
-        SetForegroundWindow(statusDialog_);
+        RevealDialog(statusDialog_);
     }
 
     void Tick() {
@@ -1159,10 +1189,15 @@ private:
     }
 
     void ShowSettings() {
-        SettingsDialogState state{options_, settingsPath_, instance_, effectiveDark_, false};
+        if (settingsDialog_) {
+            RevealDialog(settingsDialog_);
+            return;
+        }
+        SettingsDialogState state{options_, settingsPath_, instance_, effectiveDark_, &settingsDialog_, false};
         const INT_PTR result = DialogBoxParamW(
             instance_, MAKEINTRESOURCEW(IDD_SETTINGS), nullptr,
             SettingsDialogProcedure, reinterpret_cast<LPARAM>(&state));
+        settingsDialog_ = nullptr;
         if (result == -1) {
             const std::wstring error = L"Windows could not open the settings dialog.\n\n" + il2mec::Win32ErrorMessage();
             Log(error);
