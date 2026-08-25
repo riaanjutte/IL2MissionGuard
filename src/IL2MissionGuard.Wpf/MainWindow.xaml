@@ -164,7 +164,8 @@
                     <DataGrid x:Name="RecoveryGrid" AutoGenerateColumns="False" IsReadOnly="True" SelectionMode="Single"
                               HeadersVisibility="Column" GridLinesVisibility="None" BorderThickness="0" RowHeight="42"
                               ColumnWidth="Auto" HorizontalScrollBarVisibility="Auto"
-                              HorizontalAlignment="Stretch" VerticalAlignment="Stretch">
+                              HorizontalAlignment="Stretch" VerticalAlignment="Stretch"
+                              SelectionChanged="RecoveryGrid_SelectionChanged">
                         <DataGrid.Columns>
                             <DataGridTextColumn Header="Created" Binding="{Binding CreatedLocal}" />
                             <DataGridTextColumn Header="Mission" Binding="{Binding Mission}" />

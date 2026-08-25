@@ -166,7 +166,7 @@ public partial class MainWindow : FluentWindow
             .ToList();
         RecoveryGrid.ItemsSource = listedRecoveryRows;
         DeleteSnapshotsButton.IsEnabled = listedRecoveryRows.Count > 0;
-        RestoreSnapshotButton.IsEnabled = listedRecoveryRows.Count > 0;
+        UpdateRestoreButton();
         GuardStatus status = service.Status;
         observedSnapshotCount = status.SnapshotCount;
         observedNewestSnapshot = status.LastSuccess;
@@ -220,6 +220,13 @@ public partial class MainWindow : FluentWindow
     }
 
     private void RefreshRecovery_Click(object sender, RoutedEventArgs eventArgs) => RefreshRecoveryRows();
+
+    private void RecoveryGrid_SelectionChanged(object sender, SelectionChangedEventArgs eventArgs) => UpdateRestoreButton();
+
+    private void UpdateRestoreButton()
+    {
+        RestoreSnapshotButton.IsEnabled = RecoveryGrid.SelectedItem is RecoveryRow row && row.Snapshot.IsRestorable;
+    }
 
     private void ViewAllSnapshots_Changed(object sender, RoutedEventArgs eventArgs)
     {
