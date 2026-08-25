@@ -155,6 +155,7 @@ public partial class MainWindow : FluentWindow
             .ToList();
         RecoveryGrid.ItemsSource = listedRecoveryRows;
         DeleteSnapshotsButton.IsEnabled = listedRecoveryRows.Count > 0;
+        RestoreSnapshotButton.IsEnabled = listedRecoveryRows.Count > 0;
     }
 
     private void ShowPage(FrameworkElement page)

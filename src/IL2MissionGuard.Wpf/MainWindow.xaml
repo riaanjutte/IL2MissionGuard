@@ -184,7 +184,7 @@
                                Icon="{ui:SymbolIcon FolderOpen24}" Click="OpenSnapshots_Click" />
                     <ui:Button x:Name="DeleteSnapshotsButton" Grid.Column="2" Content="Delete listed snapshots" Margin="10,0,0,0"
                                Appearance="Danger" Icon="{ui:SymbolIcon Delete24}" Click="DeleteSnapshots_Click" />
-                    <ui:Button Grid.Column="4" Appearance="Primary" Content="Restore selected point"
+                    <ui:Button x:Name="RestoreSnapshotButton" Grid.Column="4" Appearance="Primary" Content="Restore selected point"
                                Icon="{ui:SymbolIcon History24}" Click="Restore_Click" />
                 </Grid>
             </Grid>
