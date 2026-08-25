@@ -26,7 +26,7 @@
             <Setter Property="FontSize" Value="12" />
             <Setter Property="Margin" Value="0,0,0,4" />
         </Style>
-        <Style x:Key="RestoreButtonStyle" TargetType="{x:Type ui:Button}"
+        <Style x:Key="SuccessButtonStyle" TargetType="{x:Type ui:Button}"
                BasedOn="{StaticResource {x:Type ui:Button}}">
             <Style.Triggers>
                 <Trigger Property="IsEnabled" Value="True">
@@ -113,7 +113,8 @@
                             <TextBlock x:Name="StateText" FontSize="18" FontWeight="SemiBold" TextWrapping="Wrap" />
                             <TextBlock x:Name="StateDetailText" Opacity="0.66" Margin="0,6,0,0" TextWrapping="Wrap" />
                         </StackPanel>
-                        <ui:Button Grid.Column="2" Appearance="Primary" Content="Create recovery point" Padding="18,9" Click="CreateRecovery_Click" />
+                        <ui:Button Grid.Column="2" Appearance="Primary" Style="{StaticResource SuccessButtonStyle}"
+                                   Content="Create recovery point" Padding="18,9" Click="CreateRecovery_Click" />
                     </Grid>
                 </ui:Card>
 
@@ -199,7 +200,7 @@
                     <ui:Button x:Name="DeleteSnapshotsButton" Grid.Column="2" Content="Delete listed snapshots" Margin="10,0,0,0"
                                Appearance="Danger" Icon="{ui:SymbolIcon Delete24}" Click="DeleteSnapshots_Click" />
                     <ui:Button x:Name="RestoreSnapshotButton" Grid.Column="4" Appearance="Primary"
-                               Style="{StaticResource RestoreButtonStyle}" Content="Restore selected point"
+                               Style="{StaticResource SuccessButtonStyle}" Content="Restore selected point"
                                Icon="{ui:SymbolIcon History24}" Click="Restore_Click" />
                 </Grid>
             </Grid>
