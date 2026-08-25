@@ -15,7 +15,7 @@
 namespace fs = std::filesystem;
 using namespace std::chrono_literals;
 
-namespace il2mec {
+namespace missionguard {
 namespace {
 
 constexpr wchar_t kLatestReleaseApi[] = L"https://api.github.com/repos/riaanjutte/IL2MissionGuard/releases?per_page=20";
@@ -197,4 +197,4 @@ int ApplyPendingUpdate(const fs::path& targetValue, DWORD processId) {
     return 0;
 }
 
-}  // namespace il2mec
+}  // namespace missionguard

@@ -14,10 +14,10 @@ IL-2 Mission Guard is a .NET 10 x64 Windows tray application with a WPF UI that 
 - Tests must use temporary files and must never modify installed editors.
 - Treat warnings as errors and keep the static MSVC runtime.
 
-## Compatibility
+## Runtime contracts
 
-The `Local\IL2MEC.AutoSave.Agent` mutex, `Local\IL2MEC.AutoSave.Stop` event, `.il2mec-autosave.json` metadata format, and `%LOCALAPPDATA%\IL2MEC` storage root are intentional compatibility contracts inherited from IL2MEC. Do not change them without a tested migration plan.
+The `Local\IL2MissionGuard.AutoSave.Agent` mutex, `Local\IL2MissionGuard.AutoSave.Stop` event, `.missionguard-autosave.json` metadata format, and `%LOCALAPPDATA%\IL2MissionGuard` storage root are stable runtime contracts. Do not change them without a tested migration plan.
 
 ## Build and test
 
-Run `build.ps1`. It executes the legacy native compatibility tests and the managed regression suite, then publishes the .NET 10 WPF application to `artifacts\release\win-x64`.
+Run `build.ps1`. It executes the native and managed regression suites, then publishes the .NET 10 WPF application to `artifacts\release\win-x64`.

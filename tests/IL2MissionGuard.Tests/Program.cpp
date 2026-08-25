@@ -41,20 +41,20 @@ fs::path NewTestRoot() {
 void TestSettings(const fs::path& root) {
     fs::path ini = root / L"settings.ini";
     Write(ini, "[AutoSave]\nEnabled=true\nGreatBattles=false\nKorea=true\nIntervalMinutes=7\nHistoricSnapshots=12\nTrayNotifications=false\nTheme=Dark\n");
-    auto options = il2mec::LoadAutoSaveOptions(ini);
+    auto options = missionguard::LoadAutoSaveOptions(ini);
     Require(options.enabled && !options.greatBattles && options.korea, "settings editor selection");
     Require(options.intervalMinutes == 7 && options.historicSnapshots == 12 && !options.trayNotifications &&
-            options.theme == il2mec::ThemeMode::Dark, "settings values");
+            options.theme == missionguard::ThemeMode::Dark, "settings values");
     Write(ini, "[AutoSave]\nIntervalMinutes=999\n");
-    Require(il2mec::LoadAutoSaveOptions(ini) == il2mec::AutoSaveOptions{}, "invalid settings fallback");
+    Require(missionguard::LoadAutoSaveOptions(ini) == missionguard::AutoSaveOptions{}, "invalid settings fallback");
 
     Write(ini,
           "[EditorDimensions]\nMissionTreeWidth=333\n\n"
           "[KoreaOptions]\nForceViewportToSdr=true\n\n"
           "[AutoSave]\nEnabled=true\nIntervalMinutes=5\n");
-    const il2mec::AutoSaveOptions requested{true, false, true, 17, 42, false, il2mec::ThemeMode::Light};
-    il2mec::SaveAutoSaveOptions(ini, requested);
-    Require(il2mec::LoadAutoSaveOptions(ini) == requested, "saved autosave settings round trip");
+    const missionguard::AutoSaveOptions requested{true, false, true, 17, 42, false, missionguard::ThemeMode::Light};
+    missionguard::SaveAutoSaveOptions(ini, requested);
+    Require(missionguard::LoadAutoSaveOptions(ini) == requested, "saved autosave settings round trip");
     const std::string updated = Read(ini);
     Require(updated.find("MissionTreeWidth=333") != std::string::npos, "dimension section preserved");
     Require(updated.find("ForceViewportToSdr=true") != std::string::npos, "Korea section preserved");
@@ -62,40 +62,40 @@ void TestSettings(const fs::path& root) {
 
     bool invalidRejected = false;
     try {
-        il2mec::SaveAutoSaveOptions(ini, il2mec::AutoSaveOptions{true, false, false, 5, 10, true, il2mec::ThemeMode::System});
+        missionguard::SaveAutoSaveOptions(ini, missionguard::AutoSaveOptions{true, false, false, 5, 10, true, missionguard::ThemeMode::System});
     } catch (const std::invalid_argument&) {
         invalidRejected = true;
     }
     Require(invalidRejected, "invalid saved settings rejected");
-    Require(il2mec::LoadAutoSaveOptions(ini) == requested, "invalid save left settings unchanged");
+    Require(missionguard::LoadAutoSaveOptions(ini) == requested, "invalid save left settings unchanged");
 
-    const il2mec::AutoSaveOptions bothEditorsOff{false, false, false, 5, 10, true, il2mec::ThemeMode::System};
-    il2mec::SaveAutoSaveOptions(ini, bothEditorsOff);
-    Require(il2mec::LoadAutoSaveOptions(ini) == bothEditorsOff, "both editor autosave toggles can be disabled");
+    const missionguard::AutoSaveOptions bothEditorsOff{false, false, false, 5, 10, true, missionguard::ThemeMode::System};
+    missionguard::SaveAutoSaveOptions(ini, bothEditorsOff);
+    Require(missionguard::LoadAutoSaveOptions(ini) == bothEditorsOff, "both editor autosave toggles can be disabled");
 }
 
 void TestMissionTitle(const fs::path& root) {
     fs::path mission = fs::absolute(root / L"Title Mission.Mission");
     Write(mission, "mission");
     fs::path parsed;
-    Require(il2mec::TryGetSavedMissionPath(L"IL2 Series Editor - " + mission.wstring() + L" *", parsed), "dirty mission title parse");
+    Require(missionguard::TryGetSavedMissionPath(L"IL2 Series Editor - " + mission.wstring() + L" *", parsed), "dirty mission title parse");
     Require(parsed == mission, "dirty mission path");
     fs::path binary = mission; binary.replace_extension(L".msnbin");
-    Require(il2mec::TryGetSavedMissionPath(L"Editor - " + binary.wstring(), parsed), "msnbin title canonicalization");
+    Require(missionguard::TryGetSavedMissionPath(L"Editor - " + binary.wstring(), parsed), "msnbin title canonicalization");
     Require(parsed == mission, "msnbin canonical mission");
-    Require(!il2mec::TryGetSavedMissionPath(L"Editor - <empty>", parsed), "empty mission rejection");
+    Require(!missionguard::TryGetSavedMissionPath(L"Editor - <empty>", parsed), "empty mission rejection");
 }
 
 void TestUpdateMetadata() {
-    Require(il2mec::ParseSemanticVersion(L"v1.2.3") == il2mec::SemanticVersion{1, 2, 3}, "semantic version parse");
-    Require(il2mec::ParseSemanticVersion(L"v0.1.0-beta.1") == il2mec::SemanticVersion{0, 1, 0, L"beta.1"}, "prerelease version parse");
-    Require(!il2mec::ParseSemanticVersion(L"1.2") && !il2mec::ParseSemanticVersion(L"1.2.3-beta..1") &&
-            !il2mec::ParseSemanticVersion(L"1.2.3-beta.") && !il2mec::ParseSemanticVersion(L"01.2.3"), "invalid semantic versions rejected");
-    Require(il2mec::IsNewerVersion(L"v2.0.0", L"1.99.99"), "major update comparison");
-    Require(il2mec::IsNewerVersion(L"1.2.1", L"1.2.0") && !il2mec::IsNewerVersion(L"1.2.0", L"1.2.0"), "patch update comparison");
-    Require(il2mec::IsNewerVersion(L"0.1.0-beta.2", L"0.1.0-beta.1") &&
-            il2mec::IsNewerVersion(L"0.1.0", L"0.1.0-beta.2") &&
-            !il2mec::IsNewerVersion(L"0.1.0-alpha.1", L"0.1.0-beta.1"), "prerelease update comparison");
+    Require(missionguard::ParseSemanticVersion(L"v1.2.3") == missionguard::SemanticVersion{1, 2, 3}, "semantic version parse");
+    Require(missionguard::ParseSemanticVersion(L"v0.1.0-beta.1") == missionguard::SemanticVersion{0, 1, 0, L"beta.1"}, "prerelease version parse");
+    Require(!missionguard::ParseSemanticVersion(L"1.2") && !missionguard::ParseSemanticVersion(L"1.2.3-beta..1") &&
+            !missionguard::ParseSemanticVersion(L"1.2.3-beta.") && !missionguard::ParseSemanticVersion(L"01.2.3"), "invalid semantic versions rejected");
+    Require(missionguard::IsNewerVersion(L"v2.0.0", L"1.99.99"), "major update comparison");
+    Require(missionguard::IsNewerVersion(L"1.2.1", L"1.2.0") && !missionguard::IsNewerVersion(L"1.2.0", L"1.2.0"), "patch update comparison");
+    Require(missionguard::IsNewerVersion(L"0.1.0-beta.2", L"0.1.0-beta.1") &&
+            missionguard::IsNewerVersion(L"0.1.0", L"0.1.0-beta.2") &&
+            !missionguard::IsNewerVersion(L"0.1.0-alpha.1", L"0.1.0-beta.1"), "prerelease update comparison");
 
     const std::string json = R"([{
         "tag_name":"v0.1.0-beta.2",
@@ -106,7 +106,7 @@ void TestUpdateMetadata() {
             "digest":"sha256:d62319688f4f86f4d70a555e794eb5f673fa6ef1fadb6a48780b0d413b171b19"
         }]
     }])";
-    const auto release = il2mec::ParseGitHubLatestReleaseJson(json);
+    const auto release = missionguard::ParseGitHubLatestReleaseJson(json);
     Require(release.version == L"v0.1.0-beta.2" && release.sha256 == L"d62319688f4f86f4d70a555e794eb5f673fa6ef1fadb6a48780b0d413b171b19", "GitHub release parse");
 
     bool untrustedRejected = false;
@@ -114,7 +114,7 @@ void TestUpdateMetadata() {
         std::string untrusted = json;
         const auto position = untrusted.find("https://github.com/riaanjutte/IL2MissionGuard/releases/download/");
         untrusted.replace(position, std::string("https://github.com/riaanjutte/IL2MissionGuard/releases/download/").size(), "https://example.com/");
-        (void)il2mec::ParseGitHubLatestReleaseJson(untrusted);
+        (void)missionguard::ParseGitHubLatestReleaseJson(untrusted);
     } catch (...) { untrustedRejected = true; }
     Require(untrustedRejected, "untrusted update URL rejected");
 }
@@ -126,8 +126,8 @@ void TestStabilityAndSnapshots(const fs::path& root) {
     fs::path localization = missions / L"RecoveryTest.eng";
     Write(mission, "version-one"); Write(binary, "compiled-one"); Write(localization, "english-one");
 
-    il2mec::WaitUntilMissionFamilyStable(mission, 1s, 10ms, 3, 20ms);
-    il2mec::SnapshotStore store(root / L"Autosave", 2);
+    missionguard::WaitUntilMissionFamilyStable(mission, 1s, 10ms, 3, 20ms);
+    missionguard::SnapshotStore store(root / L"Autosave", 2);
     Require(store.CountSnapshots() == 0, "empty snapshot count");
     fs::path fakeEditor = fs::absolute(root / L"IL2Editor.exe"); Write(fakeEditor, "fake");
     auto firstTime = std::chrono::system_clock::now() - 3s;
@@ -168,7 +168,7 @@ void TestLegacyImport(const fs::path& root) {
     fs::path destination = root / L"Imported";
     Write(legacy / L"Mission_ABC" / L"old.Mission", "old");
     Write(legacy / L"Mission_ABC" / L"ignored.tmp-123", "temporary");
-    il2mec::SnapshotStore store(destination, 10);
+    missionguard::SnapshotStore store(destination, 10);
     Require(store.ImportLegacySnapshots(legacy) == 1, "legacy import count");
     Require(fs::exists(destination / L"Mission_ABC" / L"old.Mission"), "legacy file imported");
     Require(fs::exists(legacy / L"Mission_ABC" / L"old.Mission"), "legacy source retained");
@@ -187,7 +187,7 @@ int wmain() {
         TestLegacyImport(root);
         wchar_t verifyExisting[8]{};
         if (GetEnvironmentVariableW(L"IL2MISSIONGUARD_VERIFY_DEFAULT_SNAPSHOTS", verifyExisting, static_cast<DWORD>(std::size(verifyExisting))) > 0) {
-            il2mec::SnapshotStore existing;
+            missionguard::SnapshotStore existing;
             auto snapshots = existing.ListSnapshots(std::nullopt, 1);
             Require(!snapshots.empty(), "existing C# snapshot metadata compatibility");
         }
@@ -195,7 +195,7 @@ int wmain() {
         std::wcout << L"All native autosave regression tests passed.\n";
         return 0;
     } catch (const std::exception& error) {
-        std::wcerr << L"FAILED: " << il2mec::Utf8ToWide(error.what()) << L"\nTest data retained at " << root << L"\n";
+        std::wcerr << L"FAILED: " << missionguard::Utf8ToWide(error.what()) << L"\nTest data retained at " << root << L"\n";
         return 1;
     }
 }

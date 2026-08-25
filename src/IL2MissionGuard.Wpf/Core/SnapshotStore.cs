@@ -8,7 +8,7 @@ namespace IL2MissionGuard.Core;
 
 internal sealed class SnapshotStore
 {
-    private const string MetadataSuffix = ".il2mec-autosave.json";
+    private const string MetadataSuffix = ".missionguard-autosave.json";
     private static readonly JsonSerializerOptions JsonOptions = new()
     {
         WriteIndented = true,
@@ -256,7 +256,7 @@ internal sealed class SnapshotStore
             foreach (SnapshotFile file in snapshot.Files)
             {
                 string destination = ResolveMissionCompanionPath(missionPath, file.OriginalFileName);
-                string stage = destination + ".il2mec-restore-" + operation;
+                string stage = destination + ".missionguard-restore-" + operation;
                 File.Copy(ResolveChildPath(Path.GetDirectoryName(snapshot.MetadataPath)!, file.SnapshotFileName), stage, true);
                 staged.Add((stage, destination));
                 expected.Add(file.OriginalFileName);

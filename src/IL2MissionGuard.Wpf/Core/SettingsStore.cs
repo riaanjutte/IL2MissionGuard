@@ -8,15 +8,14 @@ internal static class SettingsStore
     private const string Section = "AutoSave";
 
     public static string LocalAppDataDirectory => Path.Combine(
-        Environment.GetFolderPath(Environment.SpecialFolder.LocalApplicationData), "IL2MEC");
+        Environment.GetFolderPath(Environment.SpecialFolder.LocalApplicationData), "IL2MissionGuard");
 
     public static string DefaultSettingsPath
     {
         get
         {
             string? configured = Environment.GetEnvironmentVariable("IL2MISSIONGUARD_SETTINGS_FILE");
-            configured = string.IsNullOrWhiteSpace(configured) ? Environment.GetEnvironmentVariable("IL2MEC_SETTINGS_FILE") : configured;
-            return string.IsNullOrWhiteSpace(configured) ? Path.Combine(LocalAppDataDirectory, "IL2MEC.ini") : Path.GetFullPath(configured);
+            return string.IsNullOrWhiteSpace(configured) ? Path.Combine(LocalAppDataDirectory, "IL2MissionGuard.ini") : Path.GetFullPath(configured);
         }
     }
 

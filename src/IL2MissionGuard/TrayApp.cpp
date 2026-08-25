@@ -29,9 +29,8 @@ using namespace std::chrono_literals;
 namespace {
 
 constexpr wchar_t kWindowClass[] = L"IL2MissionGuard.Window";
-// Retained so IL2MEC can upgrade and stop existing installations safely.
-constexpr wchar_t kMutexName[] = L"Local\\IL2MEC.AutoSave.Agent";
-constexpr wchar_t kStopEventName[] = L"Local\\IL2MEC.AutoSave.Stop";
+constexpr wchar_t kMutexName[] = L"Local\\IL2MissionGuard.AutoSave.Agent";
+constexpr wchar_t kStopEventName[] = L"Local\\IL2MissionGuard.AutoSave.Stop";
 constexpr UINT kTrayCallback = WM_APP + 1;
 constexpr UINT kOpenSettingsMessage = WM_APP + 2;
 constexpr UINT kUpdateWorkerComplete = WM_APP + 3;
@@ -64,7 +63,7 @@ struct ProcessInfo {
 };
 
 struct SettingsDialogState {
-    il2mec::AutoSaveOptions options;
+    missionguard::AutoSaveOptions options;
     fs::path settingsPath;
     HINSTANCE instance = nullptr;
     bool dark = false;
@@ -75,7 +74,7 @@ struct SettingsDialogState {
 struct UpdateWorkerResult {
     enum class Kind { Check, Download } kind = Kind::Check;
     bool manual = false;
-    std::optional<il2mec::GitHubRelease> release;
+    std::optional<missionguard::GitHubRelease> release;
     fs::path downloadedExecutable;
     std::wstring error;
 };
@@ -124,9 +123,9 @@ bool SystemUsesDarkTheme() {
     return value == 0;
 }
 
-bool UsesDarkTheme(il2mec::ThemeMode mode) {
-    if (mode == il2mec::ThemeMode::Dark) return true;
-    if (mode == il2mec::ThemeMode::Light) return false;
+bool UsesDarkTheme(missionguard::ThemeMode mode) {
+    if (mode == missionguard::ThemeMode::Dark) return true;
+    if (mode == missionguard::ThemeMode::Light) return false;
     return SystemUsesDarkTheme();
 }
 
@@ -292,8 +291,8 @@ fs::path ExtractWpfUi(HINSTANCE instance) {
     const void* data = loaded ? LockResource(loaded) : nullptr;
     if (!data || size == 0) throw std::runtime_error("The embedded Mission Guard interface could not be read.");
 
-    const std::wstring digest = il2mec::Sha256Bytes(data, size);
-    const fs::path directory = il2mec::LocalAppDataDirectory() / L"UI" / digest.substr(0, 16);
+    const std::wstring digest = missionguard::Sha256Bytes(data, size);
+    const fs::path directory = missionguard::LocalAppDataDirectory() / L"UI" / digest.substr(0, 16);
     const fs::path executable = directory / L"IL2MissionGuard.UI.exe";
     if (fs::exists(executable) && fs::file_size(executable) == size) return executable;
 
@@ -340,8 +339,8 @@ INT_PTR CALLBACK SettingsDialogProcedure(HWND dialog, UINT message, WPARAM wPara
         SendMessageW(theme, CB_ADDSTRING, 0, reinterpret_cast<LPARAM>(L"Use Windows setting"));
         SendMessageW(theme, CB_ADDSTRING, 0, reinterpret_cast<LPARAM>(L"Light"));
         SendMessageW(theme, CB_ADDSTRING, 0, reinterpret_cast<LPARAM>(L"Dark"));
-        const int themeIndex = state->options.theme == il2mec::ThemeMode::Dark ? 2 :
-                               state->options.theme == il2mec::ThemeMode::Light ? 1 : 0;
+        const int themeIndex = state->options.theme == missionguard::ThemeMode::Dark ? 2 :
+                               state->options.theme == missionguard::ThemeMode::Light ? 1 : 0;
         SendMessageW(theme, CB_SETCURSEL, themeIndex, 0);
         ApplyWindowTheme(dialog, state->dark);
         CenterDialog(dialog);
@@ -395,13 +394,13 @@ INT_PTR CALLBACK SettingsDialogProcedure(HWND dialog, UINT message, WPARAM wPara
         static_cast<int>(interval),
         static_cast<int>(snapshots),
         IsDlgButtonChecked(dialog, IDC_NOTIFICATIONS) == BST_CHECKED,
-        selectedTheme == 2 ? il2mec::ThemeMode::Dark : selectedTheme == 1 ? il2mec::ThemeMode::Light : il2mec::ThemeMode::System};
+        selectedTheme == 2 ? missionguard::ThemeMode::Dark : selectedTheme == 1 ? missionguard::ThemeMode::Light : missionguard::ThemeMode::System};
     try {
-        il2mec::SaveAutoSaveOptions(state->settingsPath, state->options);
+        missionguard::SaveAutoSaveOptions(state->settingsPath, state->options);
         state->saved = true;
         EndDialog(dialog, IDOK);
     } catch (const std::exception& error) {
-        MessageBoxW(dialog, (L"The settings could not be saved.\n\n" + il2mec::Utf8ToWide(error.what())).c_str(),
+        MessageBoxW(dialog, (L"The settings could not be saved.\n\n" + missionguard::Utf8ToWide(error.what())).c_str(),
                     L"IL-2 Mission Guard settings", MB_OK | MB_ICONERROR);
     }
     return TRUE;
@@ -706,14 +705,14 @@ bool OpenMission(const fs::path& executable, const std::wstring& processName, co
         std::wstring command = L"\"" + executable.wstring() + L"\"";
         STARTUPINFOW startup{sizeof(startup)}; PROCESS_INFORMATION process{};
         if (!CreateProcessW(executable.c_str(), command.data(), nullptr, nullptr, FALSE, 0, nullptr, executable.parent_path().c_str(), &startup, &process))
-            throw std::runtime_error("The Mission Editor process could not be started: " + il2mec::WideToUtf8(il2mec::Win32ErrorMessage()));
+            throw std::runtime_error("The Mission Editor process could not be started: " + missionguard::WideToUtf8(missionguard::Win32ErrorMessage()));
         CloseHandle(process.hThread); UniqueHandle processHandle(process.hProcess);
         auto deadline = std::chrono::steady_clock::now() + timeout;
         while (std::chrono::steady_clock::now() < deadline) {
             if (WaitForSingleObject(processHandle.get(), 0) == WAIT_OBJECT_0) { diagnostic = L"The Mission Editor exited before the restored mission finished opening."; restore(); return false; }
             HWND window = FindMainWindow(process.dwProcessId);
             fs::path opened;
-            if (window && il2mec::TryGetSavedMissionPath(GetWindowTextString(window), opened, false) && SamePath(opened, missionPath)) { restore(); return true; }
+            if (window && missionguard::TryGetSavedMissionPath(GetWindowTextString(window), opened, false) && SamePath(opened, missionPath)) { restore(); return true; }
             std::this_thread::sleep_for(100ms);
         }
         diagnostic = L"Timed out waiting for the restored mission to open.";
@@ -727,8 +726,8 @@ bool OpenMission(const fs::path& executable, const std::wstring& processName, co
 class TrayApp {
 public:
     TrayApp(HINSTANCE instance, fs::path settingsPath, bool openSettingsOnStart, bool openStatusOnStart, bool manualUpdateCheckOnStart)
-        : instance_(instance), settingsPath_(std::move(settingsPath)), options_(il2mec::LoadAutoSaveOptions(settingsPath_)),
-          store_(il2mec::DefaultSnapshotRoot(), options_.historicSnapshots) {
+        : instance_(instance), settingsPath_(std::move(settingsPath)), options_(missionguard::LoadAutoSaveOptions(settingsPath_)),
+          store_(missionguard::DefaultSnapshotRoot(), options_.historicSnapshots) {
         effectiveDark_ = UsesDarkTheme(options_.theme);
         ConfigureProcessTheme(effectiveDark_);
         WNDCLASSEXW windowClass{sizeof(windowClass)};
@@ -745,9 +744,9 @@ public:
         if (!stopEvent_) stopEvent_.reset(CreateEventW(nullptr, FALSE, FALSE, kStopEventName));
         taskbarCreated_ = RegisterWindowMessageW(L"TaskbarCreated");
         try {
-            int imported = store_.ImportLegacySnapshots(il2mec::LegacySnapshotRoot());
+            int imported = store_.ImportLegacySnapshots(missionguard::LegacySnapshotRoot());
             if (imported > 0) Log(L"Imported " + std::to_wstring(imported) + L" legacy autosave files. The legacy copies were retained.");
-        } catch (const std::exception& e) { Log(L"Could not import legacy autosave files: " + il2mec::Utf8ToWide(e.what())); }
+        } catch (const std::exception& e) { Log(L"Could not import legacy autosave files: " + missionguard::Utf8ToWide(e.what())); }
         snapshotCount_ = store_.CountSnapshots();
         AddTrayIcon();
         SetTimer(window_, kTimerId, 2000, nullptr);
@@ -778,9 +777,9 @@ private:
     HINSTANCE instance_{};
     HWND window_{};
     fs::path settingsPath_;
-    il2mec::AutoSaveOptions options_;
+    missionguard::AutoSaveOptions options_;
     bool effectiveDark_ = false;
-    il2mec::SnapshotStore store_;
+    missionguard::SnapshotStore store_;
     UniqueHandle stopEvent_;
     UINT taskbarCreated_{};
     NOTIFYICONDATAW tray_{sizeof(tray_)};
@@ -798,8 +797,8 @@ private:
     std::wstring lastSuccessMission_;
     std::wstring lastIssue_;
     std::size_t snapshotCount_ = 0;
-    std::vector<il2mec::Snapshot> restoreItems_;
-    std::optional<il2mec::GitHubRelease> availableUpdate_;
+    std::vector<missionguard::Snapshot> restoreItems_;
+    std::optional<missionguard::GitHubRelease> availableUpdate_;
     std::jthread updateWorker_;
     std::atomic<bool> updateWorkInProgress_{false};
 
@@ -814,7 +813,7 @@ private:
         if (!app) return DefWindowProcW(window, message, wParam, lParam);
         try { return app->HandleMessage(message, wParam, lParam); }
         catch (const std::exception& error) {
-            app->Log(L"Unexpected tray-agent error: " + il2mec::Utf8ToWide(error.what()));
+            app->Log(L"Unexpected tray-agent error: " + missionguard::Utf8ToWide(error.what()));
             return 0;
         }
     }
@@ -902,12 +901,12 @@ private:
 
     void Log(const std::wstring& message) const {
         try {
-            fs::create_directories(il2mec::DefaultLogPath().parent_path());
+            fs::create_directories(missionguard::DefaultLogPath().parent_path());
             SYSTEMTIME time{}; GetLocalTime(&time);
             char timestamp[64]{};
             sprintf_s(timestamp, "%04u-%02u-%02uT%02u:%02u:%02u.%03u ", time.wYear, time.wMonth, time.wDay, time.wHour, time.wMinute, time.wSecond, time.wMilliseconds);
-            std::ofstream output(il2mec::DefaultLogPath(), std::ios::binary | std::ios::app);
-            output << timestamp << il2mec::WideToUtf8(message) << "\r\n";
+            std::ofstream output(missionguard::DefaultLogPath(), std::ios::binary | std::ios::app);
+            output << timestamp << missionguard::WideToUtf8(message) << "\r\n";
         } catch (...) {}
     }
 
@@ -935,7 +934,7 @@ private:
         if (detectedEditors_.empty()) return ProtectionState::Idle;
         for (const auto& process : detectedEditors_) {
             fs::path mission;
-            if (!il2mec::TryGetSavedMissionPath(process.title, mission) || !protectedProcesses_.contains(process.id))
+            if (!missionguard::TryGetSavedMissionPath(process.title, mission) || !protectedProcesses_.contains(process.id))
                 return ProtectionState::Waiting;
         }
         return ProtectionState::Protected;
@@ -983,20 +982,20 @@ private:
         for (const auto& process : detectedEditors_) {
             editors.push_back(_wcsicmp(process.name.c_str(), L"STEditor") == 0 ? L"Great Battles" : L"Korea");
             fs::path mission;
-            missions.push_back(il2mec::TryGetSavedMissionPath(process.title, mission, false)
+            missions.push_back(missionguard::TryGetSavedMissionPath(process.title, mission, false)
                 ? mission.filename().wstring() : L"Not saved yet");
         }
         SetDlgItemTextW(statusDialog_, IDC_STATUS_STATE, stateText.c_str());
         SetDlgItemTextW(statusDialog_, IDC_STATUS_EDITORS, Join(editors).c_str());
         SetDlgItemTextW(statusDialog_, IDC_STATUS_MISSIONS, Join(missions).c_str());
         const std::wstring last = lastSuccessTime_
-            ? il2mec::FormatLocalMenuTime(*lastSuccessTime_) + (lastSuccessMission_.empty() ? L"" : L" — " + lastSuccessMission_)
+            ? missionguard::FormatLocalMenuTime(*lastSuccessTime_) + (lastSuccessMission_.empty() ? L"" : L" — " + lastSuccessMission_)
             : L"None this session";
         SetDlgItemTextW(statusDialog_, IDC_STATUS_LAST_SAVE, last.c_str());
         SetDlgItemTextW(statusDialog_, IDC_STATUS_NEXT_SAVE, NextSaveText().c_str());
         SetDlgItemTextW(statusDialog_, IDC_STATUS_COUNT, std::to_wstring(snapshotCount_).c_str());
         SetDlgItemTextW(statusDialog_, IDC_STATUS_ISSUE, (lastIssue_.empty() ? L"None" : lastIssue_).c_str());
-        SetDlgItemTextW(statusDialog_, IDC_STATUS_VERSION, (L"v" + std::wstring(il2mec::kCurrentVersion)).c_str());
+        SetDlgItemTextW(statusDialog_, IDC_STATUS_VERSION, (L"v" + std::wstring(missionguard::kCurrentVersion)).c_str());
         InvalidateRect(GetDlgItem(statusDialog_, IDC_STATUS_STATE), nullptr, TRUE);
     }
 
@@ -1006,7 +1005,7 @@ private:
 
     void Tick() {
         if (stopEvent_ && WaitForSingleObject(stopEvent_.get(), 0) == WAIT_OBJECT_0) { DestroyWindow(window_); window_ = nullptr; return; }
-        auto loaded = il2mec::LoadAutoSaveOptions(settingsPath_);
+        auto loaded = missionguard::LoadAutoSaveOptions(settingsPath_);
         bool scheduleChanged = loaded.enabled != options_.enabled || loaded.intervalMinutes != options_.intervalMinutes ||
                                loaded.greatBattles != options_.greatBattles || loaded.korea != options_.korea;
         bool retentionChanged = loaded.historicSnapshots != options_.historicSnapshots;
@@ -1021,7 +1020,7 @@ private:
         }
         if (scheduleChanged) nextSave_.clear();
         if (retentionChanged) {
-            store_ = il2mec::SnapshotStore(il2mec::DefaultSnapshotRoot(), options_.historicSnapshots);
+            store_ = missionguard::SnapshotStore(missionguard::DefaultSnapshotRoot(), options_.historicSnapshots);
             store_.PruneToRetentionLimit();
             snapshotCount_ = store_.CountSnapshots();
         }
@@ -1066,7 +1065,7 @@ private:
             return {false, false, editor, detail};
         }
         fs::path mission;
-        if (!il2mec::TryGetSavedMissionPath(process.title, mission)) {
+        if (!missionguard::TryGetSavedMissionPath(process.title, mission)) {
             const std::wstring detail = L"The mission needs one manual save before recovery points can be created.";
             Log(L"Skipped " + process.name + L": the mission has not been saved to a named file yet.");
             return {false, false, editor, detail};
@@ -1077,7 +1076,7 @@ private:
         if (!SendMessageTimeoutW(process.window, WM_COMMAND, kSaveCommandId, 0, SMTO_BLOCK | SMTO_ABORTIFHUNG, 10000, &result)) {
             const std::wstring detail = L"The Mission Editor did not complete its Save command.";
             SetProcessIssue(process.id, subject + L": " + detail);
-            Log(L"Autosave failed for " + mission.wstring() + L": " + il2mec::Win32ErrorMessage());
+            Log(L"Autosave failed for " + mission.wstring() + L": " + missionguard::Win32ErrorMessage());
             if (!manual) Notify(L"Mission Guard save failed", lastIssue_, NIIF_ERROR, false);
             return {false, true, subject, detail};
         }
@@ -1089,7 +1088,7 @@ private:
             return {false, true, subject, detail};
         }
         try {
-            il2mec::WaitUntilMissionFamilyStable(mission);
+            missionguard::WaitUntilMissionFamilyStable(mission);
             for (int attempt = 1;; ++attempt) {
                 try { store_.CreateSnapshot(mission, process.name, process.executable); break; }
                 catch (...) { if (attempt >= 4) throw; std::this_thread::sleep_for(250ms); }
@@ -1106,7 +1105,7 @@ private:
         } catch (const std::exception& error) {
             const std::wstring detail = L"The mission was saved, but its timestamped recovery copy failed. See the autosave log.";
             SetProcessIssue(process.id, subject + L": " + detail);
-            Log(L"Autosave saved " + mission.wstring() + L", but its recovery point failed: " + il2mec::Utf8ToWide(error.what()));
+            Log(L"Autosave saved " + mission.wstring() + L", but its recovery point failed: " + missionguard::Utf8ToWide(error.what()));
             if (!manual) Notify(L"Mission Guard recovery point failed", lastIssue_, NIIF_ERROR, false);
             return {false, true, subject, detail};
         }
@@ -1138,7 +1137,7 @@ private:
         std::vector<fs::path> result;
         for (const auto& process : FindProcesses(EnabledNames())) {
             fs::path mission;
-            if (il2mec::TryGetSavedMissionPath(process.title, mission)) result.push_back(mission);
+            if (missionguard::TryGetSavedMissionPath(process.title, mission)) result.push_back(mission);
         }
         return result;
     }
@@ -1163,7 +1162,7 @@ private:
         if (restoreItems_.empty()) AppendMenuW(restore, MF_STRING | MF_GRAYED, 0, L"No recovery points available");
         for (std::size_t i = 0; i < restoreItems_.size() && kRestoreFirst + i <= kRestoreLast; ++i) {
             const auto& snapshot = restoreItems_[i];
-            std::wstring text = (snapshot.IsRestorable() ? L"" : L"[DAMAGED]  ") + il2mec::FormatLocalMenuTime(snapshot.createdUtc) + L"  \u2014  " + snapshot.missionPath.stem().wstring();
+            std::wstring text = (snapshot.IsRestorable() ? L"" : L"[DAMAGED]  ") + missionguard::FormatLocalMenuTime(snapshot.createdUtc) + L"  \u2014  " + snapshot.missionPath.stem().wstring();
             AppendMenuW(restore, MF_STRING | (snapshot.IsRestorable() ? 0 : MF_GRAYED), kRestoreFirst + static_cast<UINT>(i), text.c_str());
         }
         AppendMenuW(menu, MF_POPUP, reinterpret_cast<UINT_PTR>(restore), L"Restore previous autosave");
@@ -1192,7 +1191,7 @@ private:
         else if (command == kMenuSave) CreateRecoveryPointNow();
         else if (command == kMenuSettings) ShowSettings();
         else if (command == kMenuFolder) OpenPath(store_.RootDirectory(), true);
-        else if (command == kMenuLog) { Log(L"Autosave log opened from the tray menu."); OpenPath(il2mec::DefaultLogPath(), false); }
+        else if (command == kMenuLog) { Log(L"Autosave log opened from the tray menu."); OpenPath(missionguard::DefaultLogPath(), false); }
         else if (command == kMenuCheckUpdates) StartUpdateCheck(true);
         else if (command == kMenuInstallUpdate && availableUpdate_) PromptToInstallUpdate();
         else if (command == kMenuExit) { DestroyWindow(window_); window_ = nullptr; }
@@ -1206,7 +1205,7 @@ private:
     void LaunchUi(const wchar_t* page) {
         try {
             const fs::path ui = ExtractWpfUi(instance_);
-            const fs::path host = il2mec::CurrentExecutablePath();
+            const fs::path host = missionguard::CurrentExecutablePath();
             const std::wstring arguments = std::wstring(L"--ui-client ") + page + L" --host " + QuoteArgument(host);
             if (reinterpret_cast<INT_PTR>(ShellExecuteW(nullptr, L"open", ui.c_str(), arguments.c_str(),
                                                         ui.parent_path().c_str(), SW_SHOWNORMAL)) <= 32) {
@@ -1217,7 +1216,7 @@ private:
             // clean pages to Windows as soon as the client has been launched.
             SetProcessWorkingSetSize(GetCurrentProcess(), static_cast<SIZE_T>(-1), static_cast<SIZE_T>(-1));
         } catch (const std::exception& error) {
-            const std::wstring detail = il2mec::Utf8ToWide(error.what());
+            const std::wstring detail = missionguard::Utf8ToWide(error.what());
             Log(L"Could not open the Mission Guard interface: " + detail);
             MessageBoxW(nullptr, detail.c_str(), L"IL-2 Mission Guard", MB_OK | MB_ICONERROR);
         }
@@ -1239,8 +1238,8 @@ private:
             auto result = std::make_unique<UpdateWorkerResult>();
             result->kind = UpdateWorkerResult::Kind::Check;
             result->manual = manual;
-            try { result->release = il2mec::FetchLatestGitHubRelease(); }
-            catch (const std::exception& error) { result->error = il2mec::Utf8ToWide(error.what()); }
+            try { result->release = missionguard::FetchLatestGitHubRelease(); }
+            catch (const std::exception& error) { result->error = missionguard::Utf8ToWide(error.what()); }
             if (!PostMessageW(target, kUpdateWorkerComplete, 0, reinterpret_cast<LPARAM>(result.get()))) return;
             result.release();
         });
@@ -1253,10 +1252,10 @@ private:
                                                  L"Mission Guard could not check GitHub for updates.\n\n" + result.error);
             return;
         }
-        if (!result.release || !il2mec::IsNewerVersion(result.release->version, il2mec::kCurrentVersion)) {
+        if (!result.release || !missionguard::IsNewerVersion(result.release->version, missionguard::kCurrentVersion)) {
             availableUpdate_.reset();
             if (result.manual) ShowThemedMessage(instance_, effectiveDark_, L"IL-2 Mission Guard update",
-                                                 L"IL-2 Mission Guard " + std::wstring(il2mec::kCurrentVersion) + L" is up to date.");
+                                                 L"IL-2 Mission Guard " + std::wstring(missionguard::kCurrentVersion) + L" is up to date.");
             return;
         }
         availableUpdate_ = result.release;
@@ -1269,13 +1268,13 @@ private:
     void PromptToInstallUpdate() {
         if (!availableUpdate_) return;
         const std::wstring message = std::wstring(L"IL-2 Mission Guard ") + availableUpdate_->version + L" is available.\n\n"
-            L"Current version: " + std::wstring(il2mec::kCurrentVersion) + L"\n\nDownload, verify, install, and restart Mission Guard now?";
+            L"Current version: " + std::wstring(missionguard::kCurrentVersion) + L"\n\nDownload, verify, install, and restart Mission Guard now?";
         if (ShowThemedMessage(instance_, effectiveDark_, L"IL-2 Mission Guard update", message, true) == IDYES) {
             StartUpdateDownload(*availableUpdate_);
         }
     }
 
-    void StartUpdateDownload(il2mec::GitHubRelease release) {
+    void StartUpdateDownload(missionguard::GitHubRelease release) {
         if (updateWorkInProgress_.exchange(true)) return;
         PrepareUpdateWorker();
         const HWND target = window_;
@@ -1283,8 +1282,8 @@ private:
             auto result = std::make_unique<UpdateWorkerResult>();
             result->kind = UpdateWorkerResult::Kind::Download;
             result->release = release;
-            try { result->downloadedExecutable = il2mec::DownloadVerifiedUpdate(release); }
-            catch (const std::exception& error) { result->error = il2mec::Utf8ToWide(error.what()); }
+            try { result->downloadedExecutable = missionguard::DownloadVerifiedUpdate(release); }
+            catch (const std::exception& error) { result->error = missionguard::Utf8ToWide(error.what()); }
             if (!PostMessageW(target, kUpdateWorkerComplete, 0, reinterpret_cast<LPARAM>(result.get()))) return;
             result.release();
         });
@@ -1298,12 +1297,12 @@ private:
             return;
         }
         try {
-            il2mec::LaunchSelfUpdate(result.downloadedExecutable, il2mec::CurrentExecutablePath(), GetCurrentProcessId());
+            missionguard::LaunchSelfUpdate(result.downloadedExecutable, missionguard::CurrentExecutablePath(), GetCurrentProcessId());
             Log(L"Verified update installer started for " + (result.release ? result.release->version : std::wstring(L"new release")) + L".");
             DestroyWindow(window_);
             window_ = nullptr;
         } catch (const std::exception& error) {
-            const std::wstring detail = il2mec::Utf8ToWide(error.what());
+            const std::wstring detail = missionguard::Utf8ToWide(error.what());
             Log(L"Update installation failed: " + detail);
             ShowThemedMessage(instance_, effectiveDark_, L"IL-2 Mission Guard update",
                               L"The verified update could not be installed.\n\n" + detail);
@@ -1317,22 +1316,22 @@ private:
             if (reinterpret_cast<INT_PTR>(ShellExecuteW(nullptr, L"open", path.c_str(), nullptr, nullptr, SW_SHOWNORMAL)) <= 32)
                 throw std::runtime_error("Windows could not open the requested path.");
         } catch (const std::exception& error) {
-            Log(L"Could not open path: " + il2mec::Utf8ToWide(error.what()));
-            MessageBoxW(nullptr, il2mec::Utf8ToWide(error.what()).c_str(), L"IL-2 Mission Guard", MB_OK | MB_ICONERROR);
+            Log(L"Could not open path: " + missionguard::Utf8ToWide(error.what()));
+            MessageBoxW(nullptr, missionguard::Utf8ToWide(error.what()).c_str(), L"IL-2 Mission Guard", MB_OK | MB_ICONERROR);
         }
     }
 
-    std::optional<ProcessInfo> FindOpenEditor(const il2mec::Snapshot& snapshot) const {
+    std::optional<ProcessInfo> FindOpenEditor(const missionguard::Snapshot& snapshot) const {
         for (const auto& process : FindProcesses({snapshot.editorProcessName})) {
             fs::path mission;
-            if (il2mec::TryGetSavedMissionPath(process.title, mission) && SamePath(mission, snapshot.missionPath)) return process;
+            if (missionguard::TryGetSavedMissionPath(process.title, mission) && SamePath(mission, snapshot.missionPath)) return process;
         }
         return std::nullopt;
     }
 
-    void Restore(const il2mec::Snapshot& snapshot) {
+    void Restore(const missionguard::Snapshot& snapshot) {
         std::wstring prompt = L"Restore " + snapshot.missionPath.filename().wstring() + L" to the recovery point from " +
-            il2mec::FormatLocalMenuTime(snapshot.createdUtc) + L"?\n\nIf this mission is open, IL-2 Mission Guard will ask the Mission Editor to close. "
+            missionguard::FormatLocalMenuTime(snapshot.createdUtc) + L"?\n\nIf this mission is open, IL-2 Mission Guard will ask the Mission Editor to close. "
             L"If the editor asks whether to save your current changes, choose Don't Save. Restoration will not begin until the editor has closed.\n\n"
             L"A separate safety copy of the current on-disk files will be made before anything is replaced.";
         if (MessageBoxW(nullptr, prompt.c_str(), L"Restore IL-2 mission recovery point", MB_YESNO | MB_ICONWARNING | MB_DEFBUTTON2) != IDYES) return;
@@ -1346,7 +1345,7 @@ private:
             std::wstring diagnostic;
             bool reopened = false;
             try { reopened = OpenMission(snapshot.editorExecutablePath, snapshot.editorProcessName, restored.missionPath, 120s, diagnostic); }
-            catch (const std::exception& error) { diagnostic = il2mec::Utf8ToWide(error.what()); }
+            catch (const std::exception& error) { diagnostic = missionguard::Utf8ToWide(error.what()); }
             if (reopened) {
                 std::wstring message = L"Restored " + snapshot.missionPath.filename().wstring() + L" and reopened it in the Mission Editor.";
                 Log(message + L" Safety backup: " + restored.safetyBackupDirectory.wstring());
@@ -1359,8 +1358,8 @@ private:
                             L"Mission reopen failed", MB_OK | MB_ICONERROR);
             }
         } catch (const std::exception& error) {
-            std::wstring message = L"The mission was not restored.\n\n" + il2mec::Utf8ToWide(error.what());
-            Log(L"Mission restore failed for " + snapshot.missionPath.wstring() + L": " + il2mec::Utf8ToWide(error.what()));
+            std::wstring message = L"The mission was not restored.\n\n" + missionguard::Utf8ToWide(error.what());
+            Log(L"Mission restore failed for " + snapshot.missionPath.wstring() + L": " + missionguard::Utf8ToWide(error.what()));
             Notify(L"Mission recovery failed", L"The selected recovery point could not be restored.", NIIF_ERROR, false);
             MessageBoxW(nullptr, message.c_str(), L"Mission recovery failed", MB_OK | MB_ICONERROR);
         }
@@ -1383,7 +1382,7 @@ int WINAPI wWinMain(HINSTANCE instance, HINSTANCE, PWSTR, int) {
             std::size_t consumed = 0;
             const unsigned long processId = std::stoul(arguments[3], &consumed, 10);
             if (consumed != arguments[3].size() || processId > MAXDWORD) throw std::runtime_error("The update process identifier is invalid.");
-            return il2mec::ApplyPendingUpdate(arguments[2], static_cast<DWORD>(processId));
+            return missionguard::ApplyPendingUpdate(arguments[2], static_cast<DWORD>(processId));
         }
         const bool openSettings = std::find(arguments.begin() + (arguments.empty() ? 0 : 1), arguments.end(), L"--settings") != arguments.end();
         const bool openStatus = std::find(arguments.begin() + (arguments.empty() ? 0 : 1), arguments.end(), L"--status") != arguments.end();
@@ -1408,13 +1407,13 @@ int WINAPI wWinMain(HINSTANCE instance, HINSTANCE, PWSTR, int) {
         wchar_t settingsOverride[32768]{};
         DWORD length = GetEnvironmentVariableW(L"IL2MISSIONGUARD_SETTINGS_FILE", settingsOverride, static_cast<DWORD>(std::size(settingsOverride)));
         if (length == 0) {
-            length = GetEnvironmentVariableW(L"IL2MEC_SETTINGS_FILE", settingsOverride, static_cast<DWORD>(std::size(settingsOverride)));
+            length = GetEnvironmentVariableW(L"IL2MISSIONGUARD_SETTINGS_FILE", settingsOverride, static_cast<DWORD>(std::size(settingsOverride)));
         }
-        fs::path settings = length > 0 && length < std::size(settingsOverride) ? fs::path(settingsOverride) : il2mec::DefaultSettingsPath();
+        fs::path settings = length > 0 && length < std::size(settingsOverride) ? fs::path(settingsOverride) : missionguard::DefaultSettingsPath();
         TrayApp app(instance, settings, openSettings, openStatus, checkUpdates);
         return app.Run();
     } catch (const std::exception& error) {
-        MessageBoxW(nullptr, il2mec::Utf8ToWide(error.what()).c_str(), L"IL-2 Mission Guard", MB_OK | MB_ICONERROR);
+        MessageBoxW(nullptr, missionguard::Utf8ToWide(error.what()).c_str(), L"IL-2 Mission Guard", MB_OK | MB_ICONERROR);
         return 1;
     }
 }

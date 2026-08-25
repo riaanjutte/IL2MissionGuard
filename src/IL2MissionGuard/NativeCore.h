@@ -8,7 +8,7 @@
 #include <string>
 #include <vector>
 
-namespace il2mec {
+namespace missionguard {
 
 enum class ThemeMode { System, Light, Dark };
 
@@ -131,4 +131,4 @@ std::string WideToUtf8(const std::wstring& value);
 std::wstring Utf8ToWide(const std::string& value);
 std::wstring Win32ErrorMessage(DWORD error = GetLastError());
 
-}  // namespace il2mec
+}  // namespace missionguard

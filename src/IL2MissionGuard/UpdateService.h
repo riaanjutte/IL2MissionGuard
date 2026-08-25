@@ -4,7 +4,7 @@
 
 #include <filesystem>
 
-namespace il2mec {
+namespace missionguard {
 
 inline constexpr wchar_t kCurrentVersion[] = L"0.1.0-beta.1";
 
@@ -17,4 +17,4 @@ void LaunchSelfUpdate(
     DWORD processId);
 int ApplyPendingUpdate(const std::filesystem::path& targetExecutable, DWORD processId);
 
-}  // namespace il2mec
+}  // namespace missionguard

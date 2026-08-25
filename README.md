@@ -4,8 +4,6 @@ IL-2 Mission Guard is a modern Windows tray application that protects work in th
 
 It asks the editor to run its normal **File > Save** command at a configurable interval, waits for the complete mission family to finish writing, and creates timestamped recovery points that can be restored from the tray menu.
 
-The application was originally developed as the autosave component of IL2MEC. It is now maintained as an independent open-source project. Compatibility identifiers and storage locations are intentionally retained so existing IL2MEC settings and recovery points continue to work.
-
 ## Features
 
 - Supports `STEditor.exe` from IL-2 Great Battles and `IL2Editor.exe` from IL-2 Korea.
@@ -59,10 +57,10 @@ Double-click the tray icon to open the live status window. You can also use `IL2
 
 ## Configuration
 
-For compatibility with existing IL2MEC installations, settings are read from:
+Settings are stored in:
 
 ```text
-%LOCALAPPDATA%\IL2MEC\IL2MEC.ini
+%LOCALAPPDATA%\IL2MissionGuard\IL2MissionGuard.ini
 ```
 
 The relevant section is:
@@ -78,9 +76,9 @@ TrayNotifications=true
 Theme=System
 ```
 
-`IntervalMinutes` accepts 1–60, `HistoricSnapshots` accepts 1–100, and `Theme` accepts `System`, `Dark`, or `Light`. The System setting follows the Windows app theme. IL2MEC can continue to manage these settings and install the compatibility build automatically.
+`IntervalMinutes` accepts 1–60, `HistoricSnapshots` accepts 1–100, and `Theme` accepts `System`, `Dark`, or `Light`. The System setting follows the Windows app theme.
 
-For isolated testing, set `IL2MISSIONGUARD_SETTINGS_FILE` to an alternative INI path. The legacy `IL2MEC_SETTINGS_FILE` override is also accepted.
+For isolated testing, set `IL2MISSIONGUARD_SETTINGS_FILE` to an alternative INI path.
 
 ## Updates
 
@@ -92,11 +90,11 @@ Installation always requires confirmation. Mission Guard downloads the exact `IL
 
 ## Storage
 
-Recovery points and diagnostics remain in the established locations:
+Recovery points and diagnostics are stored in:
 
 ```text
-%LOCALAPPDATA%\IL2MEC\Autosave
-%LOCALAPPDATA%\IL2MEC\autosave.log
+%LOCALAPPDATA%\IL2MissionGuard\Autosave
+%LOCALAPPDATA%\IL2MissionGuard\autosave.log
 ```
 
 Older `%TEMP%\STEditor\Autosave` content is imported non-destructively. Restore safety copies are kept beneath `Autosave\RecoveryBeforeRestore`.
@@ -137,16 +135,16 @@ Warnings are treated as errors. The production tray host is native C++; the on-d
 - Snapshot paths and filenames are constrained to their expected directories to prevent metadata path traversal.
 - Update metadata and downloads are accepted only from the project's expected GitHub release URLs, and the downloaded executable must pass SHA-256 verification before it can run.
 
-## Compatibility contracts
+## Runtime identifiers
 
-The following legacy names are deliberate and should not be changed without a migration plan:
+The following names are stable runtime and storage contracts:
 
-- mutex: `Local\IL2MEC.AutoSave.Agent`
-- stop event: `Local\IL2MEC.AutoSave.Stop`
-- metadata suffix: `.il2mec-autosave.json`
-- settings and recovery root: `%LOCALAPPDATA%\IL2MEC`
+- mutex: `Local\IL2MissionGuard.AutoSave.Agent`
+- stop event: `Local\IL2MissionGuard.AutoSave.Stop`
+- metadata suffix: `.missionguard-autosave.json`
+- settings and recovery root: `%LOCALAPPDATA%\IL2MissionGuard`
 
-They allow the standalone project and IL2MEC-distributed compatibility build to share one safe recovery history and prevent duplicate agents.
+They keep recovery metadata consistent and prevent duplicate Mission Guard agents.
 
 ## License
 

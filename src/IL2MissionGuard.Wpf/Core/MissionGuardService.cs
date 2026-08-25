@@ -28,7 +28,7 @@ internal sealed class MissionGuardService : IDisposable
         store = new SnapshotStore(SettingsStore.DefaultSnapshotRoot, options.HistoricSnapshots);
         if (!monitorOnly)
         {
-            stopEvent = new EventWaitHandle(false, EventResetMode.AutoReset, @"Local\IL2MEC.AutoSave.Stop");
+            stopEvent = new EventWaitHandle(false, EventResetMode.AutoReset, @"Local\IL2MissionGuard.AutoSave.Stop");
         }
         try
         {

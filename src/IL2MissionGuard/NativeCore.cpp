@@ -22,10 +22,10 @@
 
 namespace fs = std::filesystem;
 
-namespace il2mec {
+namespace missionguard {
 namespace {
 
-constexpr wchar_t kMetadataSuffix[] = L".il2mec-autosave.json";
+constexpr wchar_t kMetadataSuffix[] = L".missionguard-autosave.json";
 
 std::wstring Trim(std::wstring value) {
     const auto first = value.find_first_not_of(L" \t\r\n");
@@ -443,12 +443,10 @@ fs::path LocalAppDataDirectory() {
     PWSTR value = nullptr;
     if (FAILED(SHGetKnownFolderPath(FOLDERID_LocalAppData, KF_FLAG_DEFAULT, nullptr, &value)))
         throw std::runtime_error("Could not locate Local AppData.");
-    // Keep the established storage location so extracting the project does not
-    // orphan existing settings, logs, or recovery points.
-    fs::path result(value); CoTaskMemFree(value); return result / L"IL2MEC";
+    fs::path result(value); CoTaskMemFree(value); return result / L"IL2MissionGuard";
 }
 
-fs::path DefaultSettingsPath() { return LocalAppDataDirectory() / L"IL2MEC.ini"; }
+fs::path DefaultSettingsPath() { return LocalAppDataDirectory() / L"IL2MissionGuard.ini"; }
 fs::path DefaultSnapshotRoot() { return LocalAppDataDirectory() / L"Autosave"; }
 fs::path DefaultLogPath() { return LocalAppDataDirectory() / L"autosave.log"; }
 
@@ -878,7 +876,7 @@ RestoreResult SnapshotStore::RestoreSnapshot(const Snapshot& input) const {
     try {
         for (const auto& file : snapshot.files) {
             fs::path destination = ResolveMissionCompanionPath(missionPath, file.originalFileName);
-            fs::path stage = destination.wstring() + L".il2mec-restore-" + operation;
+            fs::path stage = destination.wstring() + L".missionguard-restore-" + operation;
             fs::copy_file(ResolveChildPath(snapshot.metadataPath.parent_path(), file.snapshotFileName), stage, fs::copy_options::overwrite_existing);
             staged.emplace_back(stage, destination);
             expected.insert(Lower(file.originalFileName));
@@ -898,4 +896,4 @@ RestoreResult SnapshotStore::RestoreSnapshot(const Snapshot& input) const {
     }
 }
 
-}  // namespace il2mec
+}  // namespace missionguard
