@@ -10,18 +10,15 @@ CAPTION "IL-2 Mission Guard settings"
 FONT 9, "Segoe UI"
 BEGIN
     GROUPBOX        "Autosave and recovery points", IDC_STATIC, 8, 7, 274, 145
-    LTEXT           "IL-2 Great Battles autosave", IDC_STATIC, 30, 21, 170, 12
-    CONTROL         "", IDC_GREAT_BATTLES, "Button", BS_AUTOCHECKBOX | WS_TABSTOP, 244, 18, 28, 14
-    LTEXT           "IL-2 Korea autosave", IDC_STATIC, 30, 40, 170, 12
-    CONTROL         "", IDC_KOREA, "Button", BS_AUTOCHECKBOX | WS_TABSTOP, 244, 37, 28, 14
+    CONTROL         "IL-2 Great Battles autosave", IDC_GREAT_BATTLES, "Button", BS_AUTOCHECKBOX | WS_TABSTOP, 30, 20, 190, 12
+    CONTROL         "IL-2 Korea autosave", IDC_KOREA, "Button", BS_AUTOCHECKBOX | WS_TABSTOP, 30, 39, 190, 12
     LTEXT           "Save every", IDC_STATIC, 30, 59, 58, 12
     EDITTEXT        IDC_INTERVAL, 92, 56, 34, 14, ES_NUMBER | ES_AUTOHSCROLL | WS_TABSTOP
     LTEXT           "minutes (1-60)", IDC_STATIC, 132, 59, 80, 12
     LTEXT           "Keep", IDC_STATIC, 30, 80, 58, 12
     EDITTEXT        IDC_SNAPSHOTS, 92, 77, 34, 14, ES_NUMBER | ES_AUTOHSCROLL | WS_TABSTOP
     LTEXT           "recovery points per mission (1-100)", IDC_STATIC, 132, 80, 142, 12
-    LTEXT           "Notify after successful recovery points", IDC_STATIC, 30, 100, 205, 12
-    CONTROL         "", IDC_NOTIFICATIONS, "Button", BS_AUTOCHECKBOX | WS_TABSTOP, 244, 97, 28, 14
+    CONTROL         "Notify after successful recovery points", IDC_NOTIFICATIONS, "Button", BS_AUTOCHECKBOX | WS_TABSTOP, 30, 99, 220, 12
     LTEXT           "Failures are always shown as notifications.", IDC_FAILURE_NOTE, 30, 119, 245, 12
     LTEXT           "Appearance:", IDC_STATIC, 30, 137, 58, 12
     COMBOBOX        IDC_THEME, 92, 134, 115, 55, CBS_DROPDOWNLIST | CBS_HASSTRINGS | WS_VSCROLL | WS_TABSTOP

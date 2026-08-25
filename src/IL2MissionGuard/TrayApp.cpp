@@ -5,8 +5,6 @@
 #include <shellapi.h>
 #include <tlhelp32.h>
 #include <dwmapi.h>
-#include <objidl.h>
-#include <gdiplus.h>
 #include <uxtheme.h>
 
 #include <algorithm>
@@ -23,7 +21,6 @@
 #include <vector>
 
 #pragma comment(lib, "dwmapi.lib")
-#pragma comment(lib, "gdiplus.lib")
 #pragma comment(lib, "uxtheme.lib")
 
 namespace fs = std::filesystem;
@@ -105,23 +102,6 @@ constexpr COLORREF kDarkText = RGB(235, 238, 242);
 constexpr COLORREF kDarkMuted = RGB(178, 185, 194);
 HBRUSH gDarkBackgroundBrush = nullptr;
 HBRUSH gDarkControlBrush = nullptr;
-constexpr wchar_t kToggleOriginalProcedure[] = L"IL2MissionGuard.ToggleOriginalProcedure";
-constexpr wchar_t kToggleDarkMode[] = L"IL2MissionGuard.ToggleDarkMode";
-
-class GdiPlusSession {
-public:
-    GdiPlusSession() {
-        Gdiplus::GdiplusStartupInput input;
-        if (Gdiplus::GdiplusStartup(&token_, &input, nullptr) != Gdiplus::Ok)
-            throw std::runtime_error("Windows could not initialize smooth UI rendering.");
-    }
-    ~GdiPlusSession() { if (token_) Gdiplus::GdiplusShutdown(token_); }
-    GdiPlusSession(const GdiPlusSession&) = delete;
-    GdiPlusSession& operator=(const GdiPlusSession&) = delete;
-
-private:
-    ULONG_PTR token_ = 0;
-};
 
 bool SystemUsesDarkTheme() {
     DWORD value = 1;
@@ -147,76 +127,6 @@ void EnsureThemeBrushes() {
     if (!gDarkControlBrush) gDarkControlBrush = CreateSolidBrush(kDarkControl);
 }
 
-void PaintToggle(HWND control, HDC device) {
-    RECT bounds{};
-    GetClientRect(control, &bounds);
-    const bool dark = reinterpret_cast<UINT_PTR>(GetPropW(control, kToggleDarkMode)) == 2;
-    const bool checked = SendMessageW(control, BM_GETCHECK, 0, 0) == BST_CHECKED;
-    const bool enabled = IsWindowEnabled(control) != FALSE;
-    FillRect(device, &bounds, dark ? gDarkBackgroundBrush : GetSysColorBrush(COLOR_3DFACE));
-    Gdiplus::Graphics graphics(device);
-    graphics.SetSmoothingMode(Gdiplus::SmoothingModeAntiAlias);
-    graphics.SetPixelOffsetMode(Gdiplus::PixelOffsetModeHighQuality);
-    const Gdiplus::REAL trackX = 1.5f;
-    const Gdiplus::REAL trackY = 2.5f;
-    const Gdiplus::REAL trackWidth = static_cast<Gdiplus::REAL>(bounds.right - bounds.left) - 3.0f;
-    const Gdiplus::REAL trackHeight = static_cast<Gdiplus::REAL>(bounds.bottom - bounds.top) - 5.0f;
-    const COLORREF trackColor = !enabled ? (dark ? RGB(63, 67, 73) : RGB(195, 195, 195))
-        : checked ? RGB(53, 132, 228) : dark ? RGB(91, 98, 108) : RGB(145, 151, 159);
-    Gdiplus::GraphicsPath trackPath;
-    trackPath.AddArc(trackX, trackY, trackHeight, trackHeight, 90.0f, 180.0f);
-    trackPath.AddArc(trackX + trackWidth - trackHeight, trackY, trackHeight, trackHeight, 270.0f, 180.0f);
-    trackPath.CloseFigure();
-    Gdiplus::SolidBrush trackBrush(Gdiplus::Color(255, GetRValue(trackColor), GetGValue(trackColor), GetBValue(trackColor)));
-    graphics.FillPath(&trackBrush, &trackPath);
-    const Gdiplus::REAL diameter = trackHeight - 4.0f;
-    const Gdiplus::REAL knobLeft = checked ? trackX + trackWidth - diameter - 2.0f : trackX + 2.0f;
-    const Gdiplus::REAL knobTop = trackY + 2.0f;
-    const COLORREF knobColor = enabled ? RGB(250, 250, 250) : RGB(165, 165, 165);
-    Gdiplus::SolidBrush shadow(Gdiplus::Color(dark ? 70 : 45, 0, 0, 0));
-    graphics.FillEllipse(&shadow, knobLeft, knobTop + 1.0f, diameter, diameter);
-    Gdiplus::SolidBrush knobBrush(Gdiplus::Color(255, GetRValue(knobColor), GetGValue(knobColor), GetBValue(knobColor)));
-    graphics.FillEllipse(&knobBrush, knobLeft, knobTop, diameter, diameter);
-    if (GetFocus() == control) {
-        RECT focus = bounds;
-        InflateRect(&focus, -1, -1);
-        DrawFocusRect(device, &focus);
-    }
-}
-
-LRESULT CALLBACK ToggleWindowProcedure(HWND control, UINT message, WPARAM wParam, LPARAM lParam) {
-    const auto original = reinterpret_cast<WNDPROC>(GetPropW(control, kToggleOriginalProcedure));
-    if (!original) return DefWindowProcW(control, message, wParam, lParam);
-    if (message == WM_ERASEBKGND) return 1;
-    if (message == WM_PAINT) {
-        PAINTSTRUCT paint{};
-        HDC device = BeginPaint(control, &paint);
-        PaintToggle(control, device);
-        EndPaint(control, &paint);
-        return 0;
-    }
-    if (message == WM_PRINTCLIENT) {
-        PaintToggle(control, reinterpret_cast<HDC>(wParam));
-        return 0;
-    }
-    const LRESULT result = CallWindowProcW(original, control, message, wParam, lParam);
-    if (message == BM_SETCHECK || message == WM_ENABLE || message == WM_SETFOCUS || message == WM_KILLFOCUS ||
-        message == WM_LBUTTONUP || message == WM_KEYUP) {
-        InvalidateRect(control, nullptr, TRUE);
-    }
-    return result;
-}
-
-void ApplyToggleTheme(HWND control, bool dark) {
-    if (!GetPropW(control, kToggleOriginalProcedure)) {
-        const auto original = reinterpret_cast<WNDPROC>(GetWindowLongPtrW(control, GWLP_WNDPROC));
-        SetPropW(control, kToggleOriginalProcedure, reinterpret_cast<HANDLE>(original));
-        SetWindowLongPtrW(control, GWLP_WNDPROC, reinterpret_cast<LONG_PTR>(ToggleWindowProcedure));
-    }
-    SetPropW(control, kToggleDarkMode, reinterpret_cast<HANDLE>(static_cast<UINT_PTR>(dark ? 2 : 1)));
-    InvalidateRect(control, nullptr, TRUE);
-}
-
 void ConfigureProcessTheme(bool dark) {
     EnsureThemeBrushes();
     HMODULE theme = GetModuleHandleW(L"uxtheme.dll");
@@ -234,9 +144,6 @@ BOOL CALLBACK ThemeChildWindow(HWND child, LPARAM parameter) {
     const bool dark = parameter != 0;
     wchar_t className[32]{};
     GetClassNameW(child, className, static_cast<int>(std::size(className)));
-    const int controlId = GetDlgCtrlID(child);
-    if (controlId == IDC_GREAT_BATTLES || controlId == IDC_KOREA || controlId == IDC_NOTIFICATIONS)
-        ApplyToggleTheme(child, dark);
     if (_wcsicmp(className, L"ComboBox") == 0)
         SetWindowTheme(child, dark ? L"DarkMode_CFD" : L"Explorer", nullptr);
     else
@@ -767,9 +674,6 @@ public:
     }
 
 private:
-    // Keep GDI+ alive for the lifetime of every settings window so the custom
-    // switches can be drawn with anti-aliased curves.
-    GdiPlusSession gdiPlus_;
     HINSTANCE instance_{};
     HWND window_{};
     fs::path settingsPath_;
