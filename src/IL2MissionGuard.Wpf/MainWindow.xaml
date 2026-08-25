@@ -155,10 +155,11 @@
                                      Content="View all snapshots" IsChecked="False"
                                      Checked="ViewAllSnapshots_Changed" Unchecked="ViewAllSnapshots_Changed" />
                 </Grid>
-                <ui:Card Grid.Row="2" Padding="0">
+                <ui:Card Grid.Row="2" Padding="0" HorizontalContentAlignment="Stretch" VerticalContentAlignment="Stretch">
                     <DataGrid x:Name="RecoveryGrid" AutoGenerateColumns="False" IsReadOnly="True" SelectionMode="Single"
                               HeadersVisibility="Column" GridLinesVisibility="None" BorderThickness="0" RowHeight="42"
-                              ColumnWidth="Auto" HorizontalScrollBarVisibility="Auto">
+                              ColumnWidth="Auto" HorizontalScrollBarVisibility="Auto"
+                              HorizontalAlignment="Stretch" VerticalAlignment="Stretch">
                         <DataGrid.Columns>
                             <DataGridTextColumn Header="Created" Binding="{Binding CreatedLocal}" />
                             <DataGridTextColumn Header="Mission" Binding="{Binding Mission}" />
