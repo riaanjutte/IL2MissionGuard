@@ -4,28 +4,28 @@
 IDI_APP_ICON ICON "..\\..\\assets\\IL2MissionGuard.ico"
 IDI_TRAY_ICON ICON "..\\..\\assets\\IL2MissionGuard-tray.ico"
 
-IDD_SETTINGS DIALOGEX 0, 0, 320, 232
+IDD_SETTINGS DIALOGEX 0, 0, 290, 202
 STYLE DS_SETFONT | DS_MODALFRAME | WS_POPUP | WS_CAPTION | WS_SYSMENU
 CAPTION "IL-2 Mission Guard settings"
 FONT 9, "Segoe UI"
 BEGIN
-    GROUPBOX        "Autosave and recovery points", IDC_STATIC, 8, 7, 304, 164
+    GROUPBOX        "Autosave and recovery points", IDC_STATIC, 8, 7, 274, 145
     CONTROL         "Enable mission autosave", IDC_AUTOSAVE_ENABLED, "Button", BS_AUTOCHECKBOX | WS_TABSTOP, 18, 21, 180, 12
-    CONTROL         "IL-2 Great Battles", IDC_GREAT_BATTLES, "Button", BS_AUTOCHECKBOX | WS_TABSTOP, 30, 40, 110, 12
-    CONTROL         "IL-2 Korea", IDC_KOREA, "Button", BS_AUTOCHECKBOX | WS_TABSTOP, 154, 40, 90, 12
-    LTEXT           "Save every", IDC_STATIC, 30, 63, 60, 12
-    EDITTEXT        IDC_INTERVAL, 91, 60, 34, 14, ES_NUMBER | ES_AUTOHSCROLL | WS_TABSTOP
-    LTEXT           "minutes (1-60)", IDC_STATIC, 131, 63, 80, 12
-    LTEXT           "Keep", IDC_STATIC, 30, 84, 35, 12
-    EDITTEXT        IDC_SNAPSHOTS, 64, 81, 34, 14, ES_NUMBER | ES_AUTOHSCROLL | WS_TABSTOP
-    LTEXT           "recovery points per mission (1-100)", IDC_STATIC, 104, 84, 167, 12
-    CONTROL         "Show a tray notification after successful recovery points", IDC_NOTIFICATIONS, "Button", BS_AUTOCHECKBOX | WS_TABSTOP, 30, 107, 276, 12
-    LTEXT           "Failures are always shown as notifications.", IDC_FAILURE_NOTE, 30, 126, 260, 12
-    LTEXT           "Appearance:", IDC_STATIC, 30, 146, 58, 12
-    COMBOBOX        IDC_THEME, 91, 143, 110, 55, CBS_DROPDOWNLIST | CBS_HASSTRINGS | WS_VSCROLL | WS_TABSTOP
-    LTEXT           "New missions need one manual save first.", IDC_NEW_MISSION_NOTE, 12, 179, 296, 13, SS_CENTER
-    DEFPUSHBUTTON   "Save", IDOK, 208, 208, 50, 16, WS_TABSTOP
-    PUSHBUTTON      "Cancel", IDCANCEL, 262, 208, 50, 16, WS_TABSTOP
+    CONTROL         "IL-2 Great Battles", IDC_GREAT_BATTLES, "Button", BS_AUTOCHECKBOX | WS_TABSTOP, 30, 39, 105, 12
+    CONTROL         "IL-2 Korea", IDC_KOREA, "Button", BS_AUTOCHECKBOX | WS_TABSTOP, 140, 39, 90, 12
+    LTEXT           "Save every", IDC_STATIC, 30, 59, 58, 12
+    EDITTEXT        IDC_INTERVAL, 92, 56, 34, 14, ES_NUMBER | ES_AUTOHSCROLL | WS_TABSTOP
+    LTEXT           "minutes (1-60)", IDC_STATIC, 132, 59, 80, 12
+    LTEXT           "Keep", IDC_STATIC, 30, 80, 58, 12
+    EDITTEXT        IDC_SNAPSHOTS, 92, 77, 34, 14, ES_NUMBER | ES_AUTOHSCROLL | WS_TABSTOP
+    LTEXT           "recovery points per mission (1-100)", IDC_STATIC, 132, 80, 142, 12
+    CONTROL         "Show a tray notification after successful recovery points", IDC_NOTIFICATIONS, "Button", BS_AUTOCHECKBOX | WS_TABSTOP, 30, 100, 245, 12
+    LTEXT           "Failures are always shown as notifications.", IDC_FAILURE_NOTE, 30, 119, 245, 12
+    LTEXT           "Appearance:", IDC_STATIC, 30, 137, 58, 12
+    COMBOBOX        IDC_THEME, 92, 134, 115, 55, CBS_DROPDOWNLIST | CBS_HASSTRINGS | WS_VSCROLL | WS_TABSTOP
+    LTEXT           "New missions need one manual save first.", IDC_NEW_MISSION_NOTE, 8, 160, 274, 13, SS_CENTER
+    DEFPUSHBUTTON   "Save", IDOK, 180, 177, 50, 16, WS_TABSTOP
+    PUSHBUTTON      "Cancel", IDCANCEL, 234, 177, 50, 16, WS_TABSTOP
 END
 
 IDD_STATUS DIALOGEX 0, 0, 370, 230
