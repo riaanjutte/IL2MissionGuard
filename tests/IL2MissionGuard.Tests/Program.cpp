@@ -117,6 +117,7 @@ void TestStabilityAndSnapshots(const fs::path& root) {
 
     il2mec::WaitUntilMissionFamilyStable(mission, 1s, 10ms, 3, 20ms);
     il2mec::SnapshotStore store(root / L"Autosave", 2);
+    Require(store.CountSnapshots() == 0, "empty snapshot count");
     fs::path fakeEditor = fs::absolute(root / L"IL2Editor.exe"); Write(fakeEditor, "fake");
     auto firstTime = std::chrono::system_clock::now() - 3s;
     auto first = store.CreateSnapshot(mission, L"IL2Editor", fakeEditor, firstTime);
@@ -131,6 +132,7 @@ void TestStabilityAndSnapshots(const fs::path& root) {
     auto third = store.CreateSnapshot(mission, L"IL2Editor", fakeEditor, std::chrono::system_clock::now() - 1s);
     auto retained = store.ListSnapshots(mission, 10);
     Require(retained.size() == 2, "per-mission retention");
+    Require(store.CountSnapshots() == 2, "fast snapshot count follows retention");
     Require(retained[0].metadataPath == third.metadataPath && retained[1].metadataPath == second.metadataPath, "newest snapshots retained");
 
     Write(mission, "unwanted-current"); Write(binary, "unwanted-compiled"); Write(localization, "unwanted-localization");

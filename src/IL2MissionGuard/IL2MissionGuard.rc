@@ -4,12 +4,12 @@
 IDI_APP_ICON ICON "..\\..\\assets\\IL2MissionGuard.ico"
 IDI_TRAY_ICON ICON "..\\..\\assets\\IL2MissionGuard-tray.ico"
 
-IDD_SETTINGS DIALOGEX 0, 0, 300, 198
+IDD_SETTINGS DIALOGEX 0, 0, 320, 216
 STYLE DS_SETFONT | DS_MODALFRAME | WS_POPUP | WS_CAPTION | WS_SYSMENU
 CAPTION "IL-2 Mission Guard settings"
 FONT 9, "Segoe UI"
 BEGIN
-    GROUPBOX        "Autosave and recovery points", IDC_STATIC, 8, 7, 284, 128
+    GROUPBOX        "Autosave and recovery points", IDC_STATIC, 8, 7, 304, 145
     CONTROL         "Enable mission autosave", IDC_AUTOSAVE_ENABLED, "Button", BS_AUTOCHECKBOX | WS_TABSTOP, 18, 21, 180, 12
     CONTROL         "IL-2 Great Battles", IDC_GREAT_BATTLES, "Button", BS_AUTOCHECKBOX | WS_TABSTOP, 30, 40, 110, 12
     CONTROL         "IL-2 Korea", IDC_KOREA, "Button", BS_AUTOCHECKBOX | WS_TABSTOP, 154, 40, 90, 12
@@ -19,15 +19,44 @@ BEGIN
     LTEXT           "Keep", IDC_STATIC, 30, 84, 35, 12
     EDITTEXT        IDC_SNAPSHOTS, 64, 81, 34, 14, ES_NUMBER | ES_AUTOHSCROLL | WS_TABSTOP
     LTEXT           "recovery points per mission (1-100)", IDC_STATIC, 104, 84, 167, 12
-    CONTROL         "Show a tray notification after each recovery point", IDC_NOTIFICATIONS, "Button", BS_AUTOCHECKBOX | WS_TABSTOP, 30, 107, 240, 12
-    LTEXT           "New missions need one manual save first.", IDC_NEW_MISSION_NOTE, 12, 143, 276, 13, SS_CENTER
-    DEFPUSHBUTTON   "Save", IDOK, 188, 174, 50, 16, WS_TABSTOP
-    PUSHBUTTON      "Cancel", IDCANCEL, 242, 174, 50, 16, WS_TABSTOP
+    CONTROL         "Show a tray notification after successful recovery points", IDC_NOTIFICATIONS, "Button", BS_AUTOCHECKBOX | WS_TABSTOP, 30, 107, 276, 12
+    LTEXT           "Failures are always shown as notifications.", IDC_FAILURE_NOTE, 30, 126, 260, 12
+    LTEXT           "New missions need one manual save first.", IDC_NEW_MISSION_NOTE, 12, 160, 296, 13, SS_CENTER
+    DEFPUSHBUTTON   "Save", IDOK, 208, 192, 50, 16, WS_TABSTOP
+    PUSHBUTTON      "Cancel", IDCANCEL, 262, 192, 50, 16, WS_TABSTOP
+END
+
+IDD_STATUS DIALOGEX 0, 0, 370, 230
+STYLE DS_SETFONT | WS_POPUP | WS_CAPTION | WS_SYSMENU
+CAPTION "IL-2 Mission Guard"
+FONT 9, "Segoe UI"
+BEGIN
+    ICON            IDI_APP_ICON, IDC_STATIC, 12, 12, 24, 24
+    LTEXT           "Protection status", IDC_STATIC, 46, 10, 90, 10
+    LTEXT           "Starting...", IDC_STATUS_STATE, 46, 23, 306, 16
+    GROUPBOX        "Current activity", IDC_STATIC, 10, 44, 350, 66
+    LTEXT           "Detected editors:", IDC_STATIC, 20, 59, 80, 10
+    LTEXT           "None", IDC_STATUS_EDITORS, 108, 59, 240, 10
+    LTEXT           "Open missions:", IDC_STATIC, 20, 76, 80, 10
+    LTEXT           "None", IDC_STATUS_MISSIONS, 108, 76, 240, 25
+    GROUPBOX        "Recovery", IDC_STATIC, 10, 116, 350, 68
+    LTEXT           "Last recovery point:", IDC_STATIC, 20, 131, 92, 10
+    LTEXT           "None this session", IDC_STATUS_LAST_SAVE, 118, 131, 230, 10
+    LTEXT           "Next recovery point:", IDC_STATIC, 20, 148, 92, 10
+    LTEXT           "Not scheduled", IDC_STATUS_NEXT_SAVE, 118, 148, 230, 10
+    LTEXT           "Stored recovery points:", IDC_STATIC, 20, 165, 100, 10
+    LTEXT           "0", IDC_STATUS_COUNT, 126, 165, 60, 10
+    LTEXT           "Last issue:", IDC_STATIC, 10, 191, 52, 10
+    LTEXT           "None", IDC_STATUS_ISSUE, 66, 191, 224, 23
+    LTEXT           "v1.3.0", IDC_STATUS_VERSION, 305, 195, 50, 10, SS_RIGHT
+    PUSHBUTTON      "Create recovery point now", IDC_STATUS_SAVE_NOW, 10, 209, 128, 16, WS_TABSTOP
+    PUSHBUTTON      "Open recovery folder", IDC_STATUS_FOLDER, 143, 209, 102, 16, WS_TABSTOP
+    DEFPUSHBUTTON   "Close", IDCANCEL, 310, 209, 50, 16, WS_TABSTOP
 END
 
 VS_VERSION_INFO VERSIONINFO
- FILEVERSION 1,2,0,0
- PRODUCTVERSION 1,2,0,0
+ FILEVERSION 1,3,0,0
+ PRODUCTVERSION 1,3,0,0
  FILEFLAGSMASK 0x3fL
 #ifdef _DEBUG
  FILEFLAGS 0x1L
@@ -44,11 +73,11 @@ BEGIN
     BEGIN
       VALUE "CompanyName", "IL2MissionGuard contributors"
       VALUE "FileDescription", "IL-2 Mission Guard"
-      VALUE "FileVersion", "1.2.0"
+      VALUE "FileVersion", "1.3.0"
       VALUE "InternalName", "IL2MissionGuard"
       VALUE "OriginalFilename", "IL2MissionGuard.exe"
       VALUE "ProductName", "IL-2 Mission Guard"
-      VALUE "ProductVersion", "1.2.0"
+      VALUE "ProductVersion", "1.3.0"
     END
   END
   BLOCK "VarFileInfo"

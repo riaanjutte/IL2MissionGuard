@@ -18,6 +18,10 @@ The application was originally developed as the autosave component of IL2MEC. It
 - Creates a separate safety backup before replacing current mission files.
 - Closes and reopens the matching editor when restoring a mission.
 - Imports legacy recovery points without deleting the old copies.
+- Provides a live status window showing detected editors, open missions, the next and most recent recovery points, stored-point count and the last failure.
+- Uses a colour-coded tray badge: grey while idle or disabled, yellow while waiting, green once protected and red after a failed recovery attempt.
+- Reports the result of every manual recovery-point request instead of silently skipping it.
+- Allows routine success notifications to be muted while always showing failures.
 - Checks the official GitHub Releases feed for updates without blocking the tray application.
 - Downloads only the expected release executable and verifies GitHub's published SHA-256 digest before installation.
 - Uses a native Win32 tray process with no .NET or WinForms dependency.
@@ -33,12 +37,13 @@ Mission Guard defaults to:
 - autosave enabled for both editors;
 - saving every five minutes;
 - keeping ten recovery points per mission; and
-- showing a notification after each recovery point.
+- showing a notification after each successful recovery point (failures are always shown).
 
 A new or `<empty>` mission needs to be saved manually once so it has a filename. Mission Guard deliberately skips unnamed missions to avoid opening an unattended Save As dialog.
 
 Right-click the tray icon to:
 
+- open the Mission Guard status window;
 - create a recovery point immediately;
 - restore a previous recovery point;
 - open **Settings...** to configure every autosave option;
@@ -47,7 +52,7 @@ Right-click the tray icon to:
 - check for updates or install an available update; or
 - exit Mission Guard.
 
-You can also open the same dialog directly with `IL2MissionGuard.exe --settings`. If Mission Guard is already running, the command opens Settings in the existing tray process.
+Double-click the tray icon to open the live status window. You can also use `IL2MissionGuard.exe --status`, or open Settings directly with `IL2MissionGuard.exe --settings`. If Mission Guard is already running, either command opens the requested window in the existing tray process.
 
 ## Configuration
 

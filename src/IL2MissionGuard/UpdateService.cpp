@@ -39,7 +39,7 @@ std::vector<unsigned char> HttpGet(const std::wstring& url, const wchar_t* heade
     std::wstring path(components.lpszUrlPath, components.dwUrlPathLength);
     if (components.lpszExtraInfo && components.dwExtraInfoLength) path.append(components.lpszExtraInfo, components.dwExtraInfoLength);
 
-    InternetHandle session(WinHttpOpen(L"IL2MissionGuard/1.2.0", WINHTTP_ACCESS_TYPE_AUTOMATIC_PROXY,
+    InternetHandle session(WinHttpOpen(L"IL2MissionGuard/1.3.0", WINHTTP_ACCESS_TYPE_AUTOMATIC_PROXY,
                                        WINHTTP_NO_PROXY_NAME, WINHTTP_NO_PROXY_BYPASS, 0));
     if (!session) throw std::runtime_error("Windows could not initialize the update connection.");
     WinHttpSetTimeouts(session.get(), 5000, 5000, 10000, 10000);

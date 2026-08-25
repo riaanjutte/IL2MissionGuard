@@ -108,6 +108,7 @@ public:
     std::vector<Snapshot> ListSnapshots(
         const std::optional<std::filesystem::path>& missionPath = std::nullopt,
         int maximum = INT_MAX) const;
+    [[nodiscard]] std::size_t CountSnapshots() const;
     void PruneToRetentionLimit();
     RestoreResult RestoreSnapshot(const Snapshot& snapshot) const;
 

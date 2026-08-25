@@ -762,6 +762,18 @@ std::vector<Snapshot> SnapshotStore::ListSnapshots(const std::optional<fs::path>
     return result;
 }
 
+std::size_t SnapshotStore::CountSnapshots() const {
+    if (!fs::is_directory(rootDirectory_)) return 0;
+    std::size_t count = 0;
+    const std::size_t suffixLength = std::size(kMetadataSuffix) - 1;
+    for (const auto& entry : fs::recursive_directory_iterator(rootDirectory_, fs::directory_options::skip_permission_denied)) {
+        if (!entry.is_regular_file()) continue;
+        const std::wstring name = entry.path().filename().wstring();
+        if (name.size() >= suffixLength && EqualsInsensitive(name.substr(name.size() - suffixLength), kMetadataSuffix)) ++count;
+    }
+    return count;
+}
+
 void SnapshotStore::EnforceRetention(const fs::path& directory) const {
     std::vector<Snapshot> snapshots;
     if (!fs::is_directory(directory)) return;
