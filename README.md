@@ -4,6 +4,12 @@ IL-2 Mission Guard is a modern Windows tray application that protects work in th
 
 It asks the editor to run its normal **File > Save** command at a configurable interval, waits for the complete mission family to finish writing, and creates timestamped recovery points that can be restored from the tray menu.
 
+## Download
+
+Download the current executable from [GitHub Releases](https://github.com/riaanjutte/IL2MissionGuard/releases). Mission Guard is portable and does not require an installer.
+
+Future release executables will use free code signing provided by [SignPath.io](https://signpath.io/), with a certificate issued by the [SignPath Foundation](https://signpath.org/). The application is currently pending, so existing beta releases are unsigned. See the project's [code signing policy](CODE_SIGNING_POLICY.md) and [privacy policy](PRIVACY.md).
+
 ## Features
 
 - Supports `STEditor.exe` from IL-2 Great Battles and `IL2Editor.exe` from IL-2 Korea.
@@ -108,6 +114,12 @@ Recovery points and diagnostics are stored in:
 ```
 
 Older `%TEMP%\STEditor\Autosave` content is imported non-destructively. Restore safety copies are kept beneath `Autosave\RecoveryBeforeRestore`.
+
+## Uninstalling
+
+Exit Mission Guard from its notification-area menu and delete `IL2MissionGuard.exe`. If another utility was configured to start Mission Guard alongside an editor, disable that integration as well.
+
+Settings, logs, and recovery points are intentionally left under `%LOCALAPPDATA%\IL2MissionGuard` to prevent accidental data loss. Delete that folder only if you no longer need any recovery points.
 
 ## Build
 
