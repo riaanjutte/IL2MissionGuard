@@ -102,6 +102,7 @@ public partial class MainWindow : FluentWindow
     private void Service_StatusChanged(object? sender, EventArgs eventArgs)
     {
         UpdateStatus();
+        UpdateRestoreButton();
         GuardStatus status = service.Status;
         if (RecoveryPage.Visibility == Visibility.Visible &&
             (status.SnapshotCount != observedSnapshotCount || status.LastSuccess != observedNewestSnapshot))
@@ -225,7 +226,8 @@ public partial class MainWindow : FluentWindow
 
     private void UpdateRestoreButton()
     {
-        RestoreSnapshotButton.IsEnabled = RecoveryGrid.SelectedItem is RecoveryRow row && row.Snapshot.IsRestorable;
+        RestoreSnapshotButton.IsEnabled = service.Status.Editors.Count > 0 &&
+            RecoveryGrid.SelectedItem is RecoveryRow row && row.Snapshot.IsRestorable;
     }
 
     private void ViewAllSnapshots_Changed(object sender, RoutedEventArgs eventArgs)
@@ -281,6 +283,11 @@ public partial class MainWindow : FluentWindow
 
     private async void Restore_Click(object sender, RoutedEventArgs eventArgs)
     {
+        if (service.Status.Editors.Count == 0)
+        {
+            return;
+        }
+
         if (RecoveryGrid.SelectedItem is not RecoveryRow row || !row.Snapshot.IsRestorable)
         {
             await ShowMessageAsync("Restore recovery point", "Select a verified recovery point first.");
