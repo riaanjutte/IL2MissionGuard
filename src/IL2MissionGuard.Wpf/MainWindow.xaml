@@ -127,11 +127,31 @@
                 <Grid Grid.Row="4">
                     <Grid.ColumnDefinitions><ColumnDefinition /><ColumnDefinition Width="14" /><ColumnDefinition /></Grid.ColumnDefinitions>
                     <ui:Card Padding="20">
-                        <StackPanel>
-                            <TextBlock Text="EDITORS" Style="{StaticResource MetaLabelStyle}" />
-                            <TextBlock x:Name="EditorsText" FontSize="17" FontWeight="SemiBold" TextWrapping="Wrap" />
-                            <TextBlock x:Name="MissionsText" Opacity="0.66" Margin="0,7,0,0" TextWrapping="Wrap" />
-                        </StackPanel>
+                        <Grid>
+                            <Grid.ColumnDefinitions>
+                                <ColumnDefinition Width="*" />
+                                <ColumnDefinition Width="Auto" />
+                            </Grid.ColumnDefinitions>
+                            <StackPanel VerticalAlignment="Center">
+                                <TextBlock Text="EDITORS" Style="{StaticResource MetaLabelStyle}" />
+                                <TextBlock x:Name="EditorsText" FontSize="17" FontWeight="SemiBold" TextWrapping="Wrap" />
+                                <TextBlock x:Name="MissionsText" Opacity="0.66" Margin="0,7,0,0" TextWrapping="Wrap" />
+                            </StackPanel>
+                            <StackPanel Grid.Column="1" Margin="14,0,0,0" VerticalAlignment="Center">
+                                <Border x:Name="GreatBattlesStatusArtwork" Width="142" Height="32" CornerRadius="5"
+                                        Margin="0,0,0,6" Background="#FF15191E" Visibility="Collapsed">
+                                    <Image Source="Assets/IL2-Great-Battles.png" Width="132" Height="28"
+                                           Stretch="Uniform" RenderOptions.BitmapScalingMode="HighQuality"
+                                           SnapsToDevicePixels="True" />
+                                </Border>
+                                <Border x:Name="KoreaStatusArtwork" Width="142" Height="32" CornerRadius="5"
+                                        Background="#FF15191E" Visibility="Collapsed">
+                                    <Image Source="Assets/IL2-Korea.png" Width="91" Height="29"
+                                           Stretch="Uniform" RenderOptions.BitmapScalingMode="HighQuality"
+                                           SnapsToDevicePixels="True" />
+                                </Border>
+                            </StackPanel>
+                        </Grid>
                     </ui:Card>
                     <ui:Card Grid.Column="2" Padding="20">
                         <StackPanel>

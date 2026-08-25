@@ -124,6 +124,12 @@ public partial class MainWindow : FluentWindow
         MissionsText.Text = status.Editors.Count == 0
             ? "Waiting in the notification area"
             : string.Join("  •  ", status.Editors.Select(editor => EditorInterop.TryGetSavedMissionPath(editor.Title, out string path, false) ? Path.GetFileName(path) : "Not saved yet"));
+        GreatBattlesStatusArtwork.Visibility = status.Editors.Any(editor => editor.Name.Equals("STEditor", StringComparison.OrdinalIgnoreCase))
+            ? Visibility.Visible
+            : Visibility.Collapsed;
+        KoreaStatusArtwork.Visibility = status.Editors.Any(editor => editor.Name.Equals("IL2Editor", StringComparison.OrdinalIgnoreCase))
+            ? Visibility.Visible
+            : Visibility.Collapsed;
         LastSaveText.Text = status.LastSuccess is null
             ? "None this session"
             : status.LastSuccess.Value.LocalDateTime.ToString("dd MMM, HH:mm:ss", System.Globalization.CultureInfo.CurrentCulture);
