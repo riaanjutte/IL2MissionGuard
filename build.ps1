@@ -6,6 +6,17 @@ param(
 
 $ErrorActionPreference = 'Stop'
 $root = $PSScriptRoot
+$dotnetCandidates = @(
+    (Join-Path $env:USERPROFILE '.dotnet10\dotnet.exe'),
+    (Get-Command dotnet -ErrorAction SilentlyContinue | Select-Object -ExpandProperty Source -ErrorAction SilentlyContinue)
+) | Where-Object { $_ -and (Test-Path -LiteralPath $_) }
+$dotnet = $dotnetCandidates | Where-Object {
+    (& $_ --list-sdks 2>$null) -match '^10\.'
+} | Select-Object -First 1
+if (-not $dotnet) {
+    throw '.NET 10 SDK was not found. Install the .NET 10 SDK from https://dotnet.microsoft.com/download/dotnet/10.0.'
+}
+
 $vswhere = Join-Path ${env:ProgramFiles(x86)} 'Microsoft Visual Studio\Installer\vswhere.exe'
 if (-not (Test-Path -LiteralPath $vswhere)) {
     throw 'Visual Studio Installer (vswhere.exe) was not found.'
@@ -27,10 +38,19 @@ if ($LASTEXITCODE -ne 0) {
     throw "Regression tests failed with exit code $LASTEXITCODE."
 }
 
+$managedTests = Join-Path $root 'tests\IL2MissionGuard.ManagedTests\IL2MissionGuard.ManagedTests.csproj'
+& $dotnet run --project $managedTests -c $Configuration
+if ($LASTEXITCODE -ne 0) {
+    throw "Managed regression tests failed with exit code $LASTEXITCODE."
+}
+
 $release = Join-Path $root 'artifacts\release\win-x64'
 New-Item -ItemType Directory -Path $release -Force | Out-Null
-$executable = Join-Path $root 'src\IL2MissionGuard\bin\x64\Release\IL2MissionGuard.exe'
-Copy-Item -LiteralPath $executable -Destination (Join-Path $release 'IL2MissionGuard.exe') -Force
+$project = Join-Path $root 'src\IL2MissionGuard.Wpf\IL2MissionGuard.Wpf.csproj'
+& $dotnet publish $project -c $Configuration -r win-x64 --self-contained true -o $release
+if ($LASTEXITCODE -ne 0) {
+    throw "Managed publish failed with exit code $LASTEXITCODE."
+}
 
 $file = Get-Item -LiteralPath (Join-Path $release 'IL2MissionGuard.exe')
 $hash = Get-FileHash -LiteralPath $file.FullName -Algorithm SHA256
@@ -40,4 +60,3 @@ $hash = Get-FileHash -LiteralPath $file.FullName -Algorithm SHA256
     Length = $file.Length
     SHA256 = $hash.Hash
 }
-

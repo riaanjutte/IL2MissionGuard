@@ -1,6 +1,6 @@
 # IL-2 Mission Guard
 
-IL-2 Mission Guard is a lightweight native Windows tray application that protects work in the IL-2 Great Battles and IL-2 Korea Mission Editors.
+IL-2 Mission Guard is a modern Windows tray application that protects work in the IL-2 Great Battles and IL-2 Korea Mission Editors.
 
 It asks the editor to run its normal **File > Save** command at a configurable interval, waits for the complete mission family to finish writing, and creates timestamped recovery points that can be restored from the tray menu.
 
@@ -18,16 +18,15 @@ The application was originally developed as the autosave component of IL2MEC. It
 - Creates a separate safety backup before replacing current mission files.
 - Closes and reopens the matching editor when restoring a mission.
 - Imports legacy recovery points without deleting the old copies.
-- Provides a live status window showing detected editors, open missions, the next and most recent recovery points, stored-point count and the last failure.
-- Uses a colour-coded tray badge: grey while idle or disabled, yellow while waiting, green once protected and red after a failed recovery attempt.
+- Provides a modern .NET 10/WPF dashboard showing detected editors, open missions, the next and most recent recovery points, stored-point count and the last failure.
+- Includes a structured recovery library, compact settings page, and themed update experience using WPF UI controls.
+- Uses the branded Mission Guard shield in the Windows notification area.
 - Reports the result of every manual recovery-point request instead of silently skipping it.
 - Allows routine success notifications to be muted while always showing failures.
-- Supports System, Dark, and Light appearances for its status window, settings, controls, title bars, and tray menus.
+- Supports System, Dark, and Light appearances for its dashboard, settings, controls, dialogs, and update experience.
 - Checks the official GitHub Releases feed for updates without blocking the tray application.
 - Downloads only the expected release executable and verifies GitHub's published SHA-256 digest before installation.
-- Uses a native Win32 tray process with no .NET or WinForms dependency.
-
-The native process typically uses about **10 MB of working memory** and **1–2 MB of private memory** while idle.
+- Ships as one self-contained x64 executable; users do not need to install .NET separately.
 
 ## Using Mission Guard
 
@@ -48,7 +47,7 @@ Right-click the tray icon to:
 
 - open the Mission Guard status window;
 - create a recovery point immediately;
-- restore a previous recovery point;
+- browse and restore previous recovery points;
 - open **Settings...** to configure every autosave option;
 - open the recovery-point folder;
 - open the diagnostic log;
@@ -106,6 +105,7 @@ Older `%TEMP%\STEditor\Autosave` content is imported non-destructively. Restore 
 Requirements:
 
 - Windows 10 or newer;
+- the .NET 10 SDK;
 - Visual Studio 2022 Build Tools with the Desktop development with C++ workload; and
 - the Windows 10 or 11 SDK.
 
@@ -115,14 +115,16 @@ Build and test from PowerShell:
 .\build.ps1
 ```
 
-Or build the projects directly:
+The release build remains a single self-contained executable at `artifacts\release\win-x64\IL2MissionGuard.exe`. The build script runs both the existing native compatibility tests and the managed tests before publishing.
+
+The managed projects can also be built directly:
 
 ```powershell
-& "C:\Program Files (x86)\Microsoft Visual Studio\2022\BuildTools\MSBuild\Current\Bin\MSBuild.exe" .\IL2MissionGuard.sln /p:Configuration=Release /p:Platform=x64
-& .\tests\IL2MissionGuard.Tests\bin\IL2MissionGuard.Tests.exe
+dotnet run --project .\tests\IL2MissionGuard.ManagedTests\IL2MissionGuard.ManagedTests.csproj -c Release
+dotnet publish .\src\IL2MissionGuard.Wpf\IL2MissionGuard.Wpf.csproj -c Release -r win-x64 --self-contained true -o .\artifacts\release\win-x64
 ```
 
-Warnings are treated as errors. Production builds use C++20, Unicode, `/utf-8`, the static MSVC runtime and only Windows system libraries.
+Warnings are treated as errors. The production application targets .NET 10 WPF and uses the WPF UI control library. The C++ project remains in the repository as a compatibility oracle and regression suite during the migration.
 
 ## Safety model
 

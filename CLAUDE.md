@@ -1,10 +1,10 @@
 # IL2MissionGuard project guidance
 
-IL-2 Mission Guard is a native x64 Windows tray application that saves and creates recoverable snapshots for the IL-2 Great Battles and IL-2 Korea Mission Editors.
+IL-2 Mission Guard is a .NET 10 x64 Windows tray application with a WPF UI that saves and creates recoverable snapshots for the IL-2 Great Battles and IL-2 Korea Mission Editors.
 
 ## Design constraints
 
-- Keep the production application native Win32/C++ with no managed runtime dependency.
+- Keep the production application on .NET 10 with a modern WPF UI and publish it as a self-contained, single-file x64 executable.
 - Use the editors' verified native File > Save command (`WM_COMMAND`, `0x8037`).
 - Do not patch, inject into, or synthesize keyboard input for either editor.
 - Skip unnamed missions and editors whose main windows are disabled by modal dialogs.
@@ -20,5 +20,4 @@ The `Local\IL2MEC.AutoSave.Agent` mutex, `Local\IL2MEC.AutoSave.Stop` event, `.i
 
 ## Build and test
 
-Run `build.ps1`, or build `IL2MissionGuard.sln` in Release/x64 and execute `tests\IL2MissionGuard.Tests\bin\IL2MissionGuard.Tests.exe`.
-
+Run `build.ps1`. It executes the legacy native compatibility tests and the managed regression suite, then publishes the .NET 10 WPF application to `artifacts\release\win-x64`.

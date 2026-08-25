@@ -1,0 +1,46 @@
+<Project Sdk="Microsoft.NET.Sdk">
+  <PropertyGroup>
+    <OutputType>WinExe</OutputType>
+    <TargetFramework>net10.0-windows10.0.19041.0</TargetFramework>
+    <UseWPF>true</UseWPF>
+    <UseWindowsForms>true</UseWindowsForms>
+    <Nullable>enable</Nullable>
+    <ImplicitUsings>enable</ImplicitUsings>
+    <LangVersion>latest</LangVersion>
+    <PlatformTarget>x64</PlatformTarget>
+    <RuntimeIdentifier>win-x64</RuntimeIdentifier>
+    <AssemblyName>IL2MissionGuard</AssemblyName>
+    <RootNamespace>IL2MissionGuard</RootNamespace>
+    <ApplicationIcon>..\..\assets\IL2MissionGuard.ico</ApplicationIcon>
+    <ApplicationManifest>app.manifest</ApplicationManifest>
+    <Version>2.0.0</Version>
+    <FileVersion>2.0.0.0</FileVersion>
+    <AssemblyVersion>2.0.0.0</AssemblyVersion>
+    <Product>IL-2 Mission Guard</Product>
+    <Description>Automatic recovery points for IL-2 Mission Editors</Description>
+    <Company>IL2MissionGuard contributors</Company>
+    <Copyright>IL2MissionGuard contributors</Copyright>
+    <PublishSingleFile>true</PublishSingleFile>
+    <SelfContained>true</SelfContained>
+    <IncludeNativeLibrariesForSelfExtract>true</IncludeNativeLibrariesForSelfExtract>
+    <EnableCompressionInSingleFile>true</EnableCompressionInSingleFile>
+    <DebugType>embedded</DebugType>
+    <DebugSymbols>false</DebugSymbols>
+    <TreatWarningsAsErrors>true</TreatWarningsAsErrors>
+    <EnableNETAnalyzers>true</EnableNETAnalyzers>
+    <AnalysisLevel>latest-minimum</AnalysisLevel>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <PackageReference Include="WPF-UI" Version="4.3.0" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <InternalsVisibleTo Include="IL2MissionGuard.ManagedTests" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <Resource Include="..\..\assets\IL2MissionGuard.ico" Link="Assets\IL2MissionGuard.ico" />
+    <Resource Include="..\..\assets\IL2MissionGuard-tray.ico" Link="Assets\IL2MissionGuard-tray.ico" />
+  </ItemGroup>
+</Project>
