@@ -96,6 +96,14 @@ struct StatusDialogState {
     ProtectionState protectionState = ProtectionState::Idle;
 };
 
+struct ThemedMessageState {
+    HINSTANCE instance = nullptr;
+    bool dark = false;
+    std::wstring title;
+    std::wstring message;
+    bool yesNo = false;
+};
+
 constexpr COLORREF kDarkBackground = RGB(30, 33, 38);
 constexpr COLORREF kDarkControl = RGB(42, 46, 52);
 constexpr COLORREF kDarkText = RGB(235, 238, 242);
@@ -399,6 +407,60 @@ INT_PTR CALLBACK StatusDialogProcedure(HWND dialog, UINT message, WPARAM wParam,
         return TRUE;
     }
     return FALSE;
+}
+
+INT_PTR CALLBACK ThemedMessageProcedure(HWND dialog, UINT message, WPARAM wParam, LPARAM lParam) {
+    auto* state = reinterpret_cast<ThemedMessageState*>(GetWindowLongPtrW(dialog, DWLP_USER));
+    if (message == WM_INITDIALOG) {
+        state = reinterpret_cast<ThemedMessageState*>(lParam);
+        SetWindowLongPtrW(dialog, DWLP_USER, reinterpret_cast<LONG_PTR>(state));
+        SetWindowTextW(dialog, state->title.c_str());
+        SetDlgItemTextW(dialog, IDC_MESSAGE_BODY, state->message.c_str());
+        SendMessageW(dialog, WM_SETICON, ICON_SMALL,
+                     reinterpret_cast<LPARAM>(LoadIconW(state->instance, MAKEINTRESOURCEW(IDI_APP_ICON))));
+        if (state->yesNo) {
+            SetDlgItemTextW(dialog, IDOK, L"Yes");
+        } else {
+            ShowWindow(GetDlgItem(dialog, IDNO), SW_HIDE);
+            RECT bounds{};
+            GetWindowRect(GetDlgItem(dialog, IDOK), &bounds);
+            POINT position{bounds.left, bounds.top};
+            ScreenToClient(dialog, &position);
+            SetWindowPos(GetDlgItem(dialog, IDOK), nullptr, position.x + 54, position.y, 0, 0,
+                         SWP_NOACTIVATE | SWP_NOSIZE | SWP_NOZORDER);
+        }
+        ApplyWindowTheme(dialog, state->dark);
+        CenterDialog(dialog);
+        PostMessageW(dialog, kRevealDialogMessage, 0, 0);
+        return TRUE;
+    }
+    if (!state) return FALSE;
+    if (message == kRevealDialogMessage) {
+        RevealDialog(dialog);
+        return TRUE;
+    }
+    if (message == WM_CTLCOLORDLG || message == WM_CTLCOLORSTATIC || message == WM_CTLCOLORBTN)
+        return ThemeControlColor(state->dark, message, wParam, lParam);
+    if (message == WM_DRAWITEM && DrawThemedButton(state->dark, reinterpret_cast<DRAWITEMSTRUCT*>(lParam))) return TRUE;
+    if (message == WM_COMMAND) {
+        const WORD command = LOWORD(wParam);
+        if (command == IDOK) {
+            EndDialog(dialog, state->yesNo ? IDYES : IDOK);
+            return TRUE;
+        }
+        if (command == IDNO || command == IDCANCEL) {
+            EndDialog(dialog, state->yesNo ? IDNO : IDCANCEL);
+            return TRUE;
+        }
+    }
+    return FALSE;
+}
+
+int ShowThemedMessage(HINSTANCE instance, bool dark, const std::wstring& title,
+                      const std::wstring& message, bool yesNo = false) {
+    ThemedMessageState state{instance, dark, title, message, yesNo};
+    return static_cast<int>(DialogBoxParamW(instance, MAKEINTRESOURCEW(IDD_THEMED_MESSAGE), nullptr,
+                                            ThemedMessageProcedure, reinterpret_cast<LPARAM>(&state)));
 }
 
 HICON CreateStatusIcon(HICON baseIcon, COLORREF badgeColor) {
@@ -1139,7 +1201,8 @@ private:
 
     void StartUpdateCheck(bool manual) {
         if (updateWorkInProgress_.exchange(true)) {
-            if (manual) MessageBoxW(nullptr, L"Mission Guard is already checking for an update.", L"IL-2 Mission Guard update", MB_OK | MB_ICONINFORMATION);
+            if (manual) ShowThemedMessage(instance_, effectiveDark_, L"IL-2 Mission Guard update",
+                                          L"Mission Guard is already checking for an update.");
             return;
         }
         PrepareUpdateWorker();
@@ -1158,14 +1221,14 @@ private:
     void HandleUpdateCheck(const UpdateWorkerResult& result) {
         if (!result.error.empty()) {
             Log(L"Update check failed: " + result.error);
-            if (result.manual) MessageBoxW(nullptr, (L"Mission Guard could not check GitHub for updates.\n\n" + result.error).c_str(),
-                                           L"IL-2 Mission Guard update", MB_OK | MB_ICONERROR);
+            if (result.manual) ShowThemedMessage(instance_, effectiveDark_, L"IL-2 Mission Guard update",
+                                                 L"Mission Guard could not check GitHub for updates.\n\n" + result.error);
             return;
         }
         if (!result.release || !il2mec::IsNewerVersion(result.release->version, il2mec::kCurrentVersion)) {
             availableUpdate_.reset();
-            if (result.manual) MessageBoxW(nullptr, (L"IL-2 Mission Guard " + std::wstring(il2mec::kCurrentVersion) + L" is up to date.").c_str(),
-                                           L"IL-2 Mission Guard update", MB_OK | MB_ICONINFORMATION);
+            if (result.manual) ShowThemedMessage(instance_, effectiveDark_, L"IL-2 Mission Guard update",
+                                                 L"IL-2 Mission Guard " + std::wstring(il2mec::kCurrentVersion) + L" is up to date.");
             return;
         }
         availableUpdate_ = result.release;
@@ -1179,7 +1242,7 @@ private:
         if (!availableUpdate_) return;
         const std::wstring message = std::wstring(L"IL-2 Mission Guard ") + availableUpdate_->version + L" is available.\n\n"
             L"Current version: " + std::wstring(il2mec::kCurrentVersion) + L"\n\nDownload, verify, install, and restart Mission Guard now?";
-        if (MessageBoxW(nullptr, message.c_str(), L"IL-2 Mission Guard update", MB_YESNO | MB_ICONINFORMATION) == IDYES) {
+        if (ShowThemedMessage(instance_, effectiveDark_, L"IL-2 Mission Guard update", message, true) == IDYES) {
             StartUpdateDownload(*availableUpdate_);
         }
     }
@@ -1202,8 +1265,8 @@ private:
     void HandleUpdateDownload(const UpdateWorkerResult& result) {
         if (!result.error.empty()) {
             Log(L"Update download failed: " + result.error);
-            MessageBoxW(nullptr, (L"The update could not be downloaded and verified.\n\n" + result.error).c_str(),
-                        L"IL-2 Mission Guard update", MB_OK | MB_ICONERROR);
+            ShowThemedMessage(instance_, effectiveDark_, L"IL-2 Mission Guard update",
+                              L"The update could not be downloaded and verified.\n\n" + result.error);
             return;
         }
         try {
@@ -1214,8 +1277,8 @@ private:
         } catch (const std::exception& error) {
             const std::wstring detail = il2mec::Utf8ToWide(error.what());
             Log(L"Update installation failed: " + detail);
-            MessageBoxW(nullptr, (L"The verified update could not be installed.\n\n" + detail).c_str(),
-                        L"IL-2 Mission Guard update", MB_OK | MB_ICONERROR);
+            ShowThemedMessage(instance_, effectiveDark_, L"IL-2 Mission Guard update",
+                              L"The verified update could not be installed.\n\n" + detail);
         }
     }
 
