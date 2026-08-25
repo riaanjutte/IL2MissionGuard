@@ -45,5 +45,6 @@
     <Resource Include="..\..\assets\IL2MissionGuard-source.png" Link="Assets\IL2MissionGuard-source.png" />
     <Resource Include="..\..\assets\IL2-Great-Battles.png" Link="Assets\IL2-Great-Battles.png" />
     <Resource Include="..\..\assets\IL2-Korea.png" Link="Assets\IL2-Korea.png" />
+    <Resource Include="..\..\assets\MissionMapBackground.png" Link="Assets\MissionMapBackground.png" />
   </ItemGroup>
 </Project>

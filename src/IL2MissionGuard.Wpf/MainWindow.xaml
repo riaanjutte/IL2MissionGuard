@@ -50,6 +50,12 @@
             <ColumnDefinition Width="*" />
         </Grid.ColumnDefinitions>
 
+        <Image Grid.ColumnSpan="2"
+               Source="pack://application:,,,/Assets/MissionMapBackground.png"
+               Stretch="UniformToFill" Opacity="0.40"
+               IsHitTestVisible="False"
+               RenderOptions.BitmapScalingMode="HighQuality" />
+
         <Border Grid.Column="0" Background="#16000000" BorderBrush="#18000000" BorderThickness="0,0,1,0">
             <Grid Margin="14,20,14,16">
                 <Grid.RowDefinitions>
