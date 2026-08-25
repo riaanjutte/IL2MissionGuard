@@ -42,5 +42,7 @@
   <ItemGroup>
     <Resource Include="..\..\assets\IL2MissionGuard.ico" Link="Assets\IL2MissionGuard.ico" />
     <Resource Include="..\..\assets\IL2MissionGuard-tray.ico" Link="Assets\IL2MissionGuard-tray.ico" />
+    <Resource Include="..\..\assets\IL2-Great-Battles.png" Link="Assets\IL2-Great-Battles.png" />
+    <Resource Include="..\..\assets\IL2-Korea.png" Link="Assets\IL2-Korea.png" />
   </ItemGroup>
 </Project>
