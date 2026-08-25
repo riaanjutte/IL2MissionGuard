@@ -26,6 +26,16 @@
             <Setter Property="FontSize" Value="12" />
             <Setter Property="Margin" Value="0,0,0,4" />
         </Style>
+        <Style x:Key="RestoreButtonStyle" TargetType="{x:Type ui:Button}"
+               BasedOn="{StaticResource {x:Type ui:Button}}">
+            <Style.Triggers>
+                <Trigger Property="IsEnabled" Value="True">
+                    <Setter Property="Background" Value="#16833B" />
+                    <Setter Property="BorderBrush" Value="#126C32" />
+                    <Setter Property="Foreground" Value="White" />
+                </Trigger>
+            </Style.Triggers>
+        </Style>
     </ui:FluentWindow.Resources>
 
     <Grid>
@@ -188,7 +198,8 @@
                                Icon="{ui:SymbolIcon FolderOpen24}" Click="OpenSnapshots_Click" />
                     <ui:Button x:Name="DeleteSnapshotsButton" Grid.Column="2" Content="Delete listed snapshots" Margin="10,0,0,0"
                                Appearance="Danger" Icon="{ui:SymbolIcon Delete24}" Click="DeleteSnapshots_Click" />
-                    <ui:Button x:Name="RestoreSnapshotButton" Grid.Column="4" Appearance="Primary" Content="Restore selected point"
+                    <ui:Button x:Name="RestoreSnapshotButton" Grid.Column="4" Appearance="Primary"
+                               Style="{StaticResource RestoreButtonStyle}" Content="Restore selected point"
                                Icon="{ui:SymbolIcon History24}" Click="Restore_Click" />
                 </Grid>
             </Grid>
