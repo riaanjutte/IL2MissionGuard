@@ -42,6 +42,8 @@ Mission Guard defaults to:
 
 A new or `<empty>` mission needs to be saved manually once so it has a filename. Mission Guard deliberately skips unnamed missions to avoid opening an unattended Save As dialog.
 
+Settings provides independent toggle switches for Great Battles and Korea autosave. Turning both editor switches off disables autosave completely. The successful-recovery notification has its own independent toggle; failure notifications are always shown.
+
 Right-click the tray icon to:
 
 - open the Mission Guard status window;

@@ -68,6 +68,10 @@ void TestSettings(const fs::path& root) {
     }
     Require(invalidRejected, "invalid saved settings rejected");
     Require(il2mec::LoadAutoSaveOptions(ini) == requested, "invalid save left settings unchanged");
+
+    const il2mec::AutoSaveOptions bothEditorsOff{false, false, false, 5, 10, true, il2mec::ThemeMode::System};
+    il2mec::SaveAutoSaveOptions(ini, bothEditorsOff);
+    Require(il2mec::LoadAutoSaveOptions(ini) == bothEditorsOff, "both editor autosave toggles can be disabled");
 }
 
 void TestMissionTitle(const fs::path& root) {

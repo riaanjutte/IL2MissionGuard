@@ -100,6 +100,8 @@ constexpr COLORREF kDarkText = RGB(235, 238, 242);
 constexpr COLORREF kDarkMuted = RGB(178, 185, 194);
 HBRUSH gDarkBackgroundBrush = nullptr;
 HBRUSH gDarkControlBrush = nullptr;
+constexpr wchar_t kToggleOriginalProcedure[] = L"IL2MissionGuard.ToggleOriginalProcedure";
+constexpr wchar_t kToggleDarkMode[] = L"IL2MissionGuard.ToggleDarkMode";
 
 bool SystemUsesDarkTheme() {
     DWORD value = 1;
@@ -125,6 +127,80 @@ void EnsureThemeBrushes() {
     if (!gDarkControlBrush) gDarkControlBrush = CreateSolidBrush(kDarkControl);
 }
 
+void PaintToggle(HWND control, HDC device) {
+    RECT bounds{};
+    GetClientRect(control, &bounds);
+    const bool dark = reinterpret_cast<UINT_PTR>(GetPropW(control, kToggleDarkMode)) == 2;
+    const bool checked = SendMessageW(control, BM_GETCHECK, 0, 0) == BST_CHECKED;
+    const bool enabled = IsWindowEnabled(control) != FALSE;
+    FillRect(device, &bounds, dark ? gDarkBackgroundBrush : GetSysColorBrush(COLOR_3DFACE));
+    RECT track = bounds;
+    InflateRect(&track, -1, -2);
+    const int radius = (track.bottom - track.top) / 2;
+    const COLORREF trackColor = !enabled ? (dark ? RGB(63, 67, 73) : RGB(195, 195, 195))
+        : checked ? RGB(53, 132, 228) : dark ? RGB(91, 98, 108) : RGB(145, 151, 159);
+    HBRUSH trackBrush = CreateSolidBrush(trackColor);
+    HPEN trackPen = CreatePen(PS_SOLID, 1, trackColor);
+    HGDIOBJ previousBrush = SelectObject(device, trackBrush);
+    HGDIOBJ previousPen = SelectObject(device, trackPen);
+    RoundRect(device, track.left, track.top, track.right, track.bottom, radius * 2, radius * 2);
+    SelectObject(device, previousBrush);
+    SelectObject(device, previousPen);
+    DeleteObject(trackBrush);
+    DeleteObject(trackPen);
+    const int diameter = (track.bottom - track.top) - 4;
+    const int knobLeft = checked ? track.right - diameter - 2 : track.left + 2;
+    RECT knob{knobLeft, track.top + 2, knobLeft + diameter, track.top + 2 + diameter};
+    const COLORREF knobColor = enabled ? RGB(250, 250, 250) : RGB(165, 165, 165);
+    HBRUSH knobBrush = CreateSolidBrush(knobColor);
+    HPEN knobPen = CreatePen(PS_SOLID, 1, knobColor);
+    previousBrush = SelectObject(device, knobBrush);
+    previousPen = SelectObject(device, knobPen);
+    Ellipse(device, knob.left, knob.top, knob.right, knob.bottom);
+    SelectObject(device, previousBrush);
+    SelectObject(device, previousPen);
+    DeleteObject(knobBrush);
+    DeleteObject(knobPen);
+    if (GetFocus() == control) {
+        RECT focus = bounds;
+        InflateRect(&focus, -1, -1);
+        DrawFocusRect(device, &focus);
+    }
+}
+
+LRESULT CALLBACK ToggleWindowProcedure(HWND control, UINT message, WPARAM wParam, LPARAM lParam) {
+    const auto original = reinterpret_cast<WNDPROC>(GetPropW(control, kToggleOriginalProcedure));
+    if (!original) return DefWindowProcW(control, message, wParam, lParam);
+    if (message == WM_ERASEBKGND) return 1;
+    if (message == WM_PAINT) {
+        PAINTSTRUCT paint{};
+        HDC device = BeginPaint(control, &paint);
+        PaintToggle(control, device);
+        EndPaint(control, &paint);
+        return 0;
+    }
+    if (message == WM_PRINTCLIENT) {
+        PaintToggle(control, reinterpret_cast<HDC>(wParam));
+        return 0;
+    }
+    const LRESULT result = CallWindowProcW(original, control, message, wParam, lParam);
+    if (message == BM_SETCHECK || message == WM_ENABLE || message == WM_SETFOCUS || message == WM_KILLFOCUS ||
+        message == WM_LBUTTONUP || message == WM_KEYUP) {
+        InvalidateRect(control, nullptr, TRUE);
+    }
+    return result;
+}
+
+void ApplyToggleTheme(HWND control, bool dark) {
+    if (!GetPropW(control, kToggleOriginalProcedure)) {
+        const auto original = reinterpret_cast<WNDPROC>(GetWindowLongPtrW(control, GWLP_WNDPROC));
+        SetPropW(control, kToggleOriginalProcedure, reinterpret_cast<HANDLE>(original));
+        SetWindowLongPtrW(control, GWLP_WNDPROC, reinterpret_cast<LONG_PTR>(ToggleWindowProcedure));
+    }
+    SetPropW(control, kToggleDarkMode, reinterpret_cast<HANDLE>(static_cast<UINT_PTR>(dark ? 2 : 1)));
+    InvalidateRect(control, nullptr, TRUE);
+}
+
 void ConfigureProcessTheme(bool dark) {
     EnsureThemeBrushes();
     HMODULE theme = GetModuleHandleW(L"uxtheme.dll");
@@ -142,6 +218,9 @@ BOOL CALLBACK ThemeChildWindow(HWND child, LPARAM parameter) {
     const bool dark = parameter != 0;
     wchar_t className[32]{};
     GetClassNameW(child, className, static_cast<int>(std::size(className)));
+    const int controlId = GetDlgCtrlID(child);
+    if (controlId == IDC_GREAT_BATTLES || controlId == IDC_KOREA || controlId == IDC_NOTIFICATIONS)
+        ApplyToggleTheme(child, dark);
     if (_wcsicmp(className, L"ComboBox") == 0)
         SetWindowTheme(child, dark ? L"DarkMode_CFD" : L"Explorer", nullptr);
     else
@@ -247,13 +326,6 @@ bool DrawThemedButton(bool dark, const DRAWITEMSTRUCT* item) {
     return true;
 }
 
-void UpdateSettingsControlState(HWND dialog) {
-    const bool enabled = IsDlgButtonChecked(dialog, IDC_AUTOSAVE_ENABLED) == BST_CHECKED;
-    for (int controlId : {IDC_GREAT_BATTLES, IDC_KOREA, IDC_INTERVAL, IDC_SNAPSHOTS, IDC_NOTIFICATIONS}) {
-        EnableWindow(GetDlgItem(dialog, controlId), enabled);
-    }
-}
-
 void CenterDialog(HWND dialog) {
     RECT bounds{};
     if (!GetWindowRect(dialog, &bounds)) return;
@@ -273,9 +345,8 @@ INT_PTR CALLBACK SettingsDialogProcedure(HWND dialog, UINT message, WPARAM wPara
         SetWindowLongPtrW(dialog, DWLP_USER, reinterpret_cast<LONG_PTR>(state));
         SendMessageW(dialog, WM_SETICON, ICON_SMALL,
                      reinterpret_cast<LPARAM>(LoadIconW(state->instance, MAKEINTRESOURCEW(IDI_APP_ICON))));
-        CheckDlgButton(dialog, IDC_AUTOSAVE_ENABLED, state->options.enabled ? BST_CHECKED : BST_UNCHECKED);
-        CheckDlgButton(dialog, IDC_GREAT_BATTLES, state->options.greatBattles ? BST_CHECKED : BST_UNCHECKED);
-        CheckDlgButton(dialog, IDC_KOREA, state->options.korea ? BST_CHECKED : BST_UNCHECKED);
+        CheckDlgButton(dialog, IDC_GREAT_BATTLES, state->options.enabled && state->options.greatBattles ? BST_CHECKED : BST_UNCHECKED);
+        CheckDlgButton(dialog, IDC_KOREA, state->options.enabled && state->options.korea ? BST_CHECKED : BST_UNCHECKED);
         CheckDlgButton(dialog, IDC_NOTIFICATIONS, state->options.trayNotifications ? BST_CHECKED : BST_UNCHECKED);
         SetDlgItemInt(dialog, IDC_INTERVAL, static_cast<UINT>(state->options.intervalMinutes), FALSE);
         SetDlgItemInt(dialog, IDC_SNAPSHOTS, static_cast<UINT>(state->options.historicSnapshots), FALSE);
@@ -286,7 +357,6 @@ INT_PTR CALLBACK SettingsDialogProcedure(HWND dialog, UINT message, WPARAM wPara
         const int themeIndex = state->options.theme == il2mec::ThemeMode::Dark ? 2 :
                                state->options.theme == il2mec::ThemeMode::Light ? 1 : 0;
         SendMessageW(theme, CB_SETCURSEL, themeIndex, 0);
-        UpdateSettingsControlState(dialog);
         ApplyWindowTheme(dialog, state->dark);
         CenterDialog(dialog);
         return TRUE;
@@ -302,10 +372,6 @@ INT_PTR CALLBACK SettingsDialogProcedure(HWND dialog, UINT message, WPARAM wPara
     if (message != WM_COMMAND) return FALSE;
 
     const WORD command = LOWORD(wParam);
-    if (command == IDC_AUTOSAVE_ENABLED && HIWORD(wParam) == BN_CLICKED) {
-        UpdateSettingsControlState(dialog);
-        return TRUE;
-    }
     if (command == IDCANCEL) {
         EndDialog(dialog, IDCANCEL);
         return TRUE;
@@ -315,15 +381,10 @@ INT_PTR CALLBACK SettingsDialogProcedure(HWND dialog, UINT message, WPARAM wPara
     BOOL intervalValid = FALSE, snapshotsValid = FALSE;
     const UINT interval = GetDlgItemInt(dialog, IDC_INTERVAL, &intervalValid, FALSE);
     const UINT snapshots = GetDlgItemInt(dialog, IDC_SNAPSHOTS, &snapshotsValid, FALSE);
-    const bool enabled = IsDlgButtonChecked(dialog, IDC_AUTOSAVE_ENABLED) == BST_CHECKED;
     const bool greatBattles = IsDlgButtonChecked(dialog, IDC_GREAT_BATTLES) == BST_CHECKED;
     const bool korea = IsDlgButtonChecked(dialog, IDC_KOREA) == BST_CHECKED;
+    const bool enabled = greatBattles || korea;
     const LRESULT selectedTheme = SendDlgItemMessageW(dialog, IDC_THEME, CB_GETCURSEL, 0, 0);
-    if (enabled && !greatBattles && !korea) {
-        MessageBoxW(dialog, L"Select Great Battles, Korea, or both before enabling autosave.",
-                    L"IL-2 Mission Guard settings", MB_OK | MB_ICONWARNING);
-        return TRUE;
-    }
     if (!intervalValid || interval < 1 || interval > 60 ||
         !snapshotsValid || snapshots < 1 || snapshots > 100) {
         MessageBoxW(dialog, L"Save interval must be 1-60 minutes and recovery points must be 1-100.",
@@ -796,6 +857,7 @@ private:
 
     std::set<std::wstring> EnabledNames() const {
         std::set<std::wstring> names;
+        if (!options_.enabled) return names;
         if (options_.greatBattles) names.insert(L"STEditor");
         if (options_.korea) names.insert(L"IL2Editor");
         return names;
