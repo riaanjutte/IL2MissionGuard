@@ -230,7 +230,7 @@ BOOL CALLBACK ThemeChildWindow(HWND child, LPARAM parameter) {
     if (_wcsicmp(className, L"Button") == 0) {
         const LONG_PTR style = GetWindowLongPtrW(child, GWL_STYLE);
         const LONG_PTR buttonType = style & BS_TYPEMASK;
-        if (buttonType == BS_PUSHBUTTON || buttonType == BS_DEFPUSHBUTTON || buttonType == BS_GROUPBOX) {
+        if (buttonType == BS_PUSHBUTTON || buttonType == BS_DEFPUSHBUTTON) {
             SetPropW(child, L"IL2MissionGuard.ButtonType", reinterpret_cast<HANDLE>(buttonType + 1));
             SetWindowLongPtrW(child, GWL_STYLE, (style & ~BS_TYPEMASK) | BS_OWNERDRAW);
         }
@@ -281,7 +281,6 @@ bool DrawThemedButton(bool dark, const DRAWITEMSTRUCT* item) {
     RECT bounds = item->rcItem;
     HDC device = item->hDC;
     const HBRUSH background = dark ? gDarkBackgroundBrush : GetSysColorBrush(COLOR_3DFACE);
-    FillRect(device, &bounds, background);
     std::wstring text(static_cast<std::size_t>(GetWindowTextLengthW(item->hwndItem) + 1), L'\0');
     const int copied = GetWindowTextW(item->hwndItem, text.data(), static_cast<int>(text.size()));
     text.resize(static_cast<std::size_t>(copied > 0 ? copied : 0));
@@ -300,11 +299,14 @@ bool DrawThemedButton(bool dark, const DRAWITEMSTRUCT* item) {
         LineTo(device, bounds.left, bounds.top + extent.cy / 2);
         SelectObject(device, previousPen);
         DeleteObject(pen);
+        RECT caption{bounds.left + 8, bounds.top, bounds.left + 16 + extent.cx, bounds.top + extent.cy};
+        FillRect(device, &caption, background);
         SetBkMode(device, TRANSPARENT);
         SetTextColor(device, dark ? kDarkText : GetSysColor(COLOR_WINDOWTEXT));
         TextOutW(device, bounds.left + 11, bounds.top, text.c_str(), static_cast<int>(text.size()));
         return true;
     }
+    FillRect(device, &bounds, background);
     const bool disabled = (item->itemState & ODS_DISABLED) != 0;
     const bool pressed = (item->itemState & ODS_SELECTED) != 0;
     const COLORREF fillColor = dark
