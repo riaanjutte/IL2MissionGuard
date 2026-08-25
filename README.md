@@ -30,7 +30,7 @@ The application was originally developed as the autosave component of IL2MEC. It
 
 ## Using Mission Guard
 
-Run `IL2MissionGuard.exe`. Its shield icon appears in the Windows notification area.
+Run `IL2MissionGuard.exe`. Its Mission Guard icon appears in the Windows notification area.
 
 Mission Guard defaults to:
 
