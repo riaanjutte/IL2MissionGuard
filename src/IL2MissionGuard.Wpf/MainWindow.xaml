@@ -44,7 +44,9 @@
                 </Grid.RowDefinitions>
                 <StackPanel Orientation="Horizontal">
                     <Border Width="42" Height="42" CornerRadius="12" Background="#1565C0">
-                        <Image Source="pack://application:,,,/Assets/IL2MissionGuard-tray.ico" Margin="7" />
+                        <Image Source="pack://application:,,,/Assets/IL2MissionGuard-source.png" Margin="7"
+                               Stretch="Uniform" RenderOptions.BitmapScalingMode="HighQuality"
+                               SnapsToDevicePixels="True" UseLayoutRounding="True" />
                     </Border>
                     <StackPanel Margin="12,2,0,0">
                         <TextBlock Text="MISSION GUARD" FontSize="11" FontWeight="Bold" Foreground="#55A8FF" />
