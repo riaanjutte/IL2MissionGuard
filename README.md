@@ -22,6 +22,7 @@ The application was originally developed as the autosave component of IL2MEC. It
 - Uses a colour-coded tray badge: grey while idle or disabled, yellow while waiting, green once protected and red after a failed recovery attempt.
 - Reports the result of every manual recovery-point request instead of silently skipping it.
 - Allows routine success notifications to be muted while always showing failures.
+- Supports System, Dark, and Light appearances for its status window, settings, controls, title bars, and tray menus.
 - Checks the official GitHub Releases feed for updates without blocking the tray application.
 - Downloads only the expected release executable and verifies GitHub's published SHA-256 digest before installation.
 - Uses a native Win32 tray process with no .NET or WinForms dependency.
@@ -72,9 +73,10 @@ Korea=true
 IntervalMinutes=5
 HistoricSnapshots=10
 TrayNotifications=true
+Theme=System
 ```
 
-`IntervalMinutes` accepts 1–60 and `HistoricSnapshots` accepts 1–100. IL2MEC can continue to manage these settings and install the compatibility build automatically.
+`IntervalMinutes` accepts 1–60, `HistoricSnapshots` accepts 1–100, and `Theme` accepts `System`, `Dark`, or `Light`. The System setting follows the Windows app theme. IL2MEC can continue to manage these settings and install the compatibility build automatically.
 
 For isolated testing, set `IL2MISSIONGUARD_SETTINGS_FILE` to an alternative INI path. The legacy `IL2MEC_SETTINGS_FILE` override is also accepted.
 

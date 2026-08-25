@@ -10,6 +10,8 @@
 
 namespace il2mec {
 
+enum class ThemeMode { System, Light, Dark };
+
 struct AutoSaveOptions {
     bool enabled = true;
     bool greatBattles = true;
@@ -17,6 +19,7 @@ struct AutoSaveOptions {
     int intervalMinutes = 5;
     int historicSnapshots = 10;
     bool trayNotifications = true;
+    ThemeMode theme = ThemeMode::System;
 
     bool operator==(const AutoSaveOptions&) const = default;
 };

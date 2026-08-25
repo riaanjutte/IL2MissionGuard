@@ -480,6 +480,10 @@ AutoSaveOptions LoadAutoSaveOptions(const fs::path& settingsPath) {
     options.intervalMinutes = integer(L"IntervalMinutes", 5);
     options.historicSnapshots = integer(L"HistoricSnapshots", 10);
     options.trayNotifications = boolean(L"TrayNotifications", true);
+    const std::wstring theme = Lower(read(L"Theme", L"system"));
+    if (theme == L"light") options.theme = ThemeMode::Light;
+    else if (theme == L"dark") options.theme = ThemeMode::Dark;
+    else options.theme = ThemeMode::System;
     if (options.intervalMinutes < 1 || options.intervalMinutes > 60 || options.historicSnapshots < 1 || options.historicSnapshots > 100 ||
         (options.enabled && !options.greatBattles && !options.korea)) return AutoSaveOptions{};
     return options;
@@ -509,6 +513,7 @@ void SaveAutoSaveOptions(const fs::path& settingsValue, const AutoSaveOptions& o
         write(L"IntervalMinutes", std::to_wstring(options.intervalMinutes));
         write(L"HistoricSnapshots", std::to_wstring(options.historicSnapshots));
         write(L"TrayNotifications", options.trayNotifications ? L"true" : L"false");
+        write(L"Theme", options.theme == ThemeMode::Dark ? L"Dark" : options.theme == ThemeMode::Light ? L"Light" : L"System");
         WritePrivateProfileStringW(nullptr, nullptr, nullptr, settingsPath.c_str());
     } catch (...) {
         std::error_code ignored;

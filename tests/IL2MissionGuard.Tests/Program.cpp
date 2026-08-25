@@ -40,10 +40,11 @@ fs::path NewTestRoot() {
 
 void TestSettings(const fs::path& root) {
     fs::path ini = root / L"settings.ini";
-    Write(ini, "[AutoSave]\nEnabled=true\nGreatBattles=false\nKorea=true\nIntervalMinutes=7\nHistoricSnapshots=12\nTrayNotifications=false\n");
+    Write(ini, "[AutoSave]\nEnabled=true\nGreatBattles=false\nKorea=true\nIntervalMinutes=7\nHistoricSnapshots=12\nTrayNotifications=false\nTheme=Dark\n");
     auto options = il2mec::LoadAutoSaveOptions(ini);
     Require(options.enabled && !options.greatBattles && options.korea, "settings editor selection");
-    Require(options.intervalMinutes == 7 && options.historicSnapshots == 12 && !options.trayNotifications, "settings values");
+    Require(options.intervalMinutes == 7 && options.historicSnapshots == 12 && !options.trayNotifications &&
+            options.theme == il2mec::ThemeMode::Dark, "settings values");
     Write(ini, "[AutoSave]\nIntervalMinutes=999\n");
     Require(il2mec::LoadAutoSaveOptions(ini) == il2mec::AutoSaveOptions{}, "invalid settings fallback");
 
@@ -51,16 +52,17 @@ void TestSettings(const fs::path& root) {
           "[EditorDimensions]\nMissionTreeWidth=333\n\n"
           "[KoreaOptions]\nForceViewportToSdr=true\n\n"
           "[AutoSave]\nEnabled=true\nIntervalMinutes=5\n");
-    const il2mec::AutoSaveOptions requested{true, false, true, 17, 42, false};
+    const il2mec::AutoSaveOptions requested{true, false, true, 17, 42, false, il2mec::ThemeMode::Light};
     il2mec::SaveAutoSaveOptions(ini, requested);
     Require(il2mec::LoadAutoSaveOptions(ini) == requested, "saved autosave settings round trip");
     const std::string updated = Read(ini);
     Require(updated.find("MissionTreeWidth=333") != std::string::npos, "dimension section preserved");
     Require(updated.find("ForceViewportToSdr=true") != std::string::npos, "Korea section preserved");
+    Require(updated.find("Theme=Light") != std::string::npos, "theme saved");
 
     bool invalidRejected = false;
     try {
-        il2mec::SaveAutoSaveOptions(ini, il2mec::AutoSaveOptions{true, false, false, 5, 10, true});
+        il2mec::SaveAutoSaveOptions(ini, il2mec::AutoSaveOptions{true, false, false, 5, 10, true, il2mec::ThemeMode::System});
     } catch (const std::invalid_argument&) {
         invalidRejected = true;
     }

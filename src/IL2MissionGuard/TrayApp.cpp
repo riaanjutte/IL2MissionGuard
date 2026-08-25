@@ -4,6 +4,8 @@
 
 #include <shellapi.h>
 #include <tlhelp32.h>
+#include <dwmapi.h>
+#include <uxtheme.h>
 
 #include <algorithm>
 #include <atomic>
@@ -17,6 +19,9 @@
 #include <stdexcept>
 #include <thread>
 #include <vector>
+
+#pragma comment(lib, "dwmapi.lib")
+#pragma comment(lib, "uxtheme.lib")
 
 namespace fs = std::filesystem;
 using namespace std::chrono_literals;
@@ -61,6 +66,7 @@ struct SettingsDialogState {
     il2mec::AutoSaveOptions options;
     fs::path settingsPath;
     HINSTANCE instance = nullptr;
+    bool dark = false;
     bool saved = false;
 };
 
@@ -84,7 +90,162 @@ struct SaveAttemptResult {
 struct StatusDialogState {
     HWND owner = nullptr;
     HINSTANCE instance = nullptr;
+    bool dark = false;
+    ProtectionState protectionState = ProtectionState::Idle;
 };
+
+constexpr COLORREF kDarkBackground = RGB(30, 33, 38);
+constexpr COLORREF kDarkControl = RGB(42, 46, 52);
+constexpr COLORREF kDarkText = RGB(235, 238, 242);
+constexpr COLORREF kDarkMuted = RGB(178, 185, 194);
+HBRUSH gDarkBackgroundBrush = nullptr;
+HBRUSH gDarkControlBrush = nullptr;
+
+bool SystemUsesDarkTheme() {
+    DWORD value = 1;
+    DWORD size = sizeof(value);
+    HKEY key = nullptr;
+    if (RegOpenKeyExW(HKEY_CURRENT_USER,
+                      L"Software\\Microsoft\\Windows\\CurrentVersion\\Themes\\Personalize",
+                      0, KEY_QUERY_VALUE, &key) == ERROR_SUCCESS) {
+        RegQueryValueExW(key, L"AppsUseLightTheme", nullptr, nullptr, reinterpret_cast<BYTE*>(&value), &size);
+        RegCloseKey(key);
+    }
+    return value == 0;
+}
+
+bool UsesDarkTheme(il2mec::ThemeMode mode) {
+    if (mode == il2mec::ThemeMode::Dark) return true;
+    if (mode == il2mec::ThemeMode::Light) return false;
+    return SystemUsesDarkTheme();
+}
+
+void EnsureThemeBrushes() {
+    if (!gDarkBackgroundBrush) gDarkBackgroundBrush = CreateSolidBrush(kDarkBackground);
+    if (!gDarkControlBrush) gDarkControlBrush = CreateSolidBrush(kDarkControl);
+}
+
+void ConfigureProcessTheme(bool dark) {
+    EnsureThemeBrushes();
+    HMODULE theme = GetModuleHandleW(L"uxtheme.dll");
+    if (!theme) theme = LoadLibraryW(L"uxtheme.dll");
+    if (!theme) return;
+    using SetPreferredAppMode = int(WINAPI*)(int);
+    using FlushMenuThemes = void(WINAPI*)();
+    auto setMode = reinterpret_cast<SetPreferredAppMode>(GetProcAddress(theme, MAKEINTRESOURCEA(135)));
+    auto flushMenus = reinterpret_cast<FlushMenuThemes>(GetProcAddress(theme, MAKEINTRESOURCEA(136)));
+    if (setMode) setMode(dark ? 2 : 3);  // ForceDark / ForceLight on supported Windows builds.
+    if (flushMenus) flushMenus();
+}
+
+BOOL CALLBACK ThemeChildWindow(HWND child, LPARAM parameter) {
+    const bool dark = parameter != 0;
+    wchar_t className[32]{};
+    GetClassNameW(child, className, static_cast<int>(std::size(className)));
+    if (_wcsicmp(className, L"ComboBox") == 0)
+        SetWindowTheme(child, dark ? L"DarkMode_CFD" : L"Explorer", nullptr);
+    else
+        SetWindowTheme(child, dark ? L"DarkMode_Explorer" : L"Explorer", nullptr);
+    if (_wcsicmp(className, L"Button") == 0) {
+        const LONG_PTR style = GetWindowLongPtrW(child, GWL_STYLE);
+        const LONG_PTR buttonType = style & BS_TYPEMASK;
+        if (buttonType == BS_PUSHBUTTON || buttonType == BS_DEFPUSHBUTTON || buttonType == BS_GROUPBOX) {
+            SetPropW(child, L"IL2MissionGuard.ButtonType", reinterpret_cast<HANDLE>(buttonType + 1));
+            SetWindowLongPtrW(child, GWL_STYLE, (style & ~BS_TYPEMASK) | BS_OWNERDRAW);
+        }
+    }
+    return TRUE;
+}
+
+void ApplyWindowTheme(HWND window, bool dark) {
+    if (!window) return;
+    ConfigureProcessTheme(dark);
+    BOOL enabled = dark ? TRUE : FALSE;
+    if (FAILED(DwmSetWindowAttribute(window, 20, &enabled, sizeof(enabled))))
+        DwmSetWindowAttribute(window, 19, &enabled, sizeof(enabled));
+    SetWindowTheme(window, dark ? L"DarkMode_Explorer" : L"Explorer", nullptr);
+    EnumChildWindows(window, ThemeChildWindow, dark ? 1 : 0);
+    RedrawWindow(window, nullptr, nullptr, RDW_INVALIDATE | RDW_ERASE | RDW_FRAME | RDW_ALLCHILDREN);
+}
+
+INT_PTR ThemeControlColor(bool dark, UINT message, WPARAM wParam, LPARAM lParam, bool yellowNote = false,
+                          std::optional<ProtectionState> protectionState = std::nullopt) {
+    if (!dark && !yellowNote && !protectionState) return 0;
+    HDC device = reinterpret_cast<HDC>(wParam);
+    const int controlId = lParam ? GetDlgCtrlID(reinterpret_cast<HWND>(lParam)) : 0;
+    COLORREF text = dark ? kDarkText : GetSysColor(COLOR_WINDOWTEXT);
+    if (yellowNote) text = dark ? RGB(255, 203, 72) : RGB(190, 130, 0);
+    if (protectionState && controlId == IDC_STATUS_STATE) {
+        switch (*protectionState) {
+            case ProtectionState::Protected: text = dark ? RGB(91, 221, 137) : RGB(19, 126, 61); break;
+            case ProtectionState::Waiting: text = dark ? RGB(255, 203, 72) : RGB(167, 111, 0); break;
+            case ProtectionState::Error: text = dark ? RGB(255, 112, 112) : RGB(185, 35, 35); break;
+            default: text = dark ? kDarkMuted : GetSysColor(COLOR_WINDOWTEXT); break;
+        }
+    }
+    SetTextColor(device, text);
+    if (message == WM_CTLCOLOREDIT || message == WM_CTLCOLORLISTBOX) {
+        SetBkColor(device, dark ? kDarkControl : GetSysColor(COLOR_WINDOW));
+        return reinterpret_cast<INT_PTR>(dark ? gDarkControlBrush : GetSysColorBrush(COLOR_WINDOW));
+    }
+    SetBkMode(device, TRANSPARENT);
+    return reinterpret_cast<INT_PTR>(dark ? gDarkBackgroundBrush : GetSysColorBrush(COLOR_3DFACE));
+}
+
+bool DrawThemedButton(bool dark, const DRAWITEMSTRUCT* item) {
+    if (!item || item->CtlType != ODT_BUTTON) return false;
+    const auto storedType = reinterpret_cast<UINT_PTR>(GetPropW(item->hwndItem, L"IL2MissionGuard.ButtonType"));
+    if (!storedType) return false;
+    const UINT buttonType = static_cast<UINT>(storedType - 1);
+    RECT bounds = item->rcItem;
+    HDC device = item->hDC;
+    const HBRUSH background = dark ? gDarkBackgroundBrush : GetSysColorBrush(COLOR_3DFACE);
+    FillRect(device, &bounds, background);
+    std::wstring text(static_cast<std::size_t>(GetWindowTextLengthW(item->hwndItem) + 1), L'\0');
+    const int copied = GetWindowTextW(item->hwndItem, text.data(), static_cast<int>(text.size()));
+    text.resize(static_cast<std::size_t>(copied > 0 ? copied : 0));
+    if (buttonType == BS_GROUPBOX) {
+        SIZE extent{};
+        GetTextExtentPoint32W(device, text.c_str(), static_cast<int>(text.size()), &extent);
+        const COLORREF borderColor = dark ? RGB(100, 108, 119) : RGB(145, 145, 145);
+        HPEN pen = CreatePen(PS_SOLID, 1, borderColor);
+        HGDIOBJ previousPen = SelectObject(device, pen);
+        MoveToEx(device, bounds.left, bounds.top + extent.cy / 2, nullptr);
+        LineTo(device, bounds.left + 8, bounds.top + extent.cy / 2);
+        MoveToEx(device, bounds.left + 13 + extent.cx, bounds.top + extent.cy / 2, nullptr);
+        LineTo(device, bounds.right - 1, bounds.top + extent.cy / 2);
+        LineTo(device, bounds.right - 1, bounds.bottom - 1);
+        LineTo(device, bounds.left, bounds.bottom - 1);
+        LineTo(device, bounds.left, bounds.top + extent.cy / 2);
+        SelectObject(device, previousPen);
+        DeleteObject(pen);
+        SetBkMode(device, TRANSPARENT);
+        SetTextColor(device, dark ? kDarkText : GetSysColor(COLOR_WINDOWTEXT));
+        TextOutW(device, bounds.left + 11, bounds.top, text.c_str(), static_cast<int>(text.size()));
+        return true;
+    }
+    const bool disabled = (item->itemState & ODS_DISABLED) != 0;
+    const bool pressed = (item->itemState & ODS_SELECTED) != 0;
+    const COLORREF fillColor = dark
+        ? (pressed ? RGB(62, 68, 77) : RGB(48, 53, 61))
+        : (pressed ? RGB(220, 226, 233) : RGB(248, 249, 250));
+    HBRUSH fill = CreateSolidBrush(fillColor);
+    FillRect(device, &bounds, fill);
+    DeleteObject(fill);
+    const bool defaultButton = GetDlgCtrlID(item->hwndItem) == IDOK;
+    HBRUSH border = CreateSolidBrush(defaultButton ? RGB(53, 132, 228) : dark ? RGB(105, 114, 126) : RGB(150, 155, 162));
+    FrameRect(device, &bounds, border);
+    DeleteObject(border);
+    SetBkMode(device, TRANSPARENT);
+    SetTextColor(device, disabled ? (dark ? RGB(118, 124, 133) : RGB(150, 150, 150)) : dark ? kDarkText : GetSysColor(COLOR_WINDOWTEXT));
+    if (pressed) OffsetRect(&bounds, 1, 1);
+    DrawTextW(device, text.c_str(), static_cast<int>(text.size()), &bounds, DT_CENTER | DT_VCENTER | DT_SINGLELINE);
+    if ((item->itemState & ODS_FOCUS) != 0) {
+        InflateRect(&bounds, -3, -3);
+        DrawFocusRect(device, &bounds);
+    }
+    return true;
+}
 
 void UpdateSettingsControlState(HWND dialog) {
     const bool enabled = IsDlgButtonChecked(dialog, IDC_AUTOSAVE_ENABLED) == BST_CHECKED;
@@ -118,18 +279,26 @@ INT_PTR CALLBACK SettingsDialogProcedure(HWND dialog, UINT message, WPARAM wPara
         CheckDlgButton(dialog, IDC_NOTIFICATIONS, state->options.trayNotifications ? BST_CHECKED : BST_UNCHECKED);
         SetDlgItemInt(dialog, IDC_INTERVAL, static_cast<UINT>(state->options.intervalMinutes), FALSE);
         SetDlgItemInt(dialog, IDC_SNAPSHOTS, static_cast<UINT>(state->options.historicSnapshots), FALSE);
+        HWND theme = GetDlgItem(dialog, IDC_THEME);
+        SendMessageW(theme, CB_ADDSTRING, 0, reinterpret_cast<LPARAM>(L"Use Windows setting"));
+        SendMessageW(theme, CB_ADDSTRING, 0, reinterpret_cast<LPARAM>(L"Light"));
+        SendMessageW(theme, CB_ADDSTRING, 0, reinterpret_cast<LPARAM>(L"Dark"));
+        const int themeIndex = state->options.theme == il2mec::ThemeMode::Dark ? 2 :
+                               state->options.theme == il2mec::ThemeMode::Light ? 1 : 0;
+        SendMessageW(theme, CB_SETCURSEL, themeIndex, 0);
         UpdateSettingsControlState(dialog);
+        ApplyWindowTheme(dialog, state->dark);
         CenterDialog(dialog);
         return TRUE;
     }
     if (!state) return FALSE;
 
-    if (message == WM_CTLCOLORSTATIC && GetDlgCtrlID(reinterpret_cast<HWND>(lParam)) == IDC_NEW_MISSION_NOTE) {
-        HDC device = reinterpret_cast<HDC>(wParam);
-        SetTextColor(device, RGB(190, 130, 0));
-        SetBkMode(device, TRANSPARENT);
-        return reinterpret_cast<INT_PTR>(GetSysColorBrush(COLOR_3DFACE));
+    if (message == WM_CTLCOLORDLG || message == WM_CTLCOLORSTATIC || message == WM_CTLCOLORBTN ||
+        message == WM_CTLCOLOREDIT || message == WM_CTLCOLORLISTBOX) {
+        return ThemeControlColor(state->dark, message, wParam, lParam,
+                                 message == WM_CTLCOLORSTATIC && GetDlgCtrlID(reinterpret_cast<HWND>(lParam)) == IDC_NEW_MISSION_NOTE);
     }
+    if (message == WM_DRAWITEM && DrawThemedButton(state->dark, reinterpret_cast<DRAWITEMSTRUCT*>(lParam))) return TRUE;
     if (message != WM_COMMAND) return FALSE;
 
     const WORD command = LOWORD(wParam);
@@ -149,6 +318,7 @@ INT_PTR CALLBACK SettingsDialogProcedure(HWND dialog, UINT message, WPARAM wPara
     const bool enabled = IsDlgButtonChecked(dialog, IDC_AUTOSAVE_ENABLED) == BST_CHECKED;
     const bool greatBattles = IsDlgButtonChecked(dialog, IDC_GREAT_BATTLES) == BST_CHECKED;
     const bool korea = IsDlgButtonChecked(dialog, IDC_KOREA) == BST_CHECKED;
+    const LRESULT selectedTheme = SendDlgItemMessageW(dialog, IDC_THEME, CB_GETCURSEL, 0, 0);
     if (enabled && !greatBattles && !korea) {
         MessageBoxW(dialog, L"Select Great Battles, Korea, or both before enabling autosave.",
                     L"IL-2 Mission Guard settings", MB_OK | MB_ICONWARNING);
@@ -167,7 +337,8 @@ INT_PTR CALLBACK SettingsDialogProcedure(HWND dialog, UINT message, WPARAM wPara
         korea,
         static_cast<int>(interval),
         static_cast<int>(snapshots),
-        IsDlgButtonChecked(dialog, IDC_NOTIFICATIONS) == BST_CHECKED};
+        IsDlgButtonChecked(dialog, IDC_NOTIFICATIONS) == BST_CHECKED,
+        selectedTheme == 2 ? il2mec::ThemeMode::Dark : selectedTheme == 1 ? il2mec::ThemeMode::Light : il2mec::ThemeMode::System};
     try {
         il2mec::SaveAutoSaveOptions(state->settingsPath, state->options);
         state->saved = true;
@@ -186,10 +357,16 @@ INT_PTR CALLBACK StatusDialogProcedure(HWND dialog, UINT message, WPARAM wParam,
         SetWindowLongPtrW(dialog, DWLP_USER, reinterpret_cast<LONG_PTR>(state));
         SendMessageW(dialog, WM_SETICON, ICON_SMALL,
                      reinterpret_cast<LPARAM>(LoadIconW(state->instance, MAKEINTRESOURCEW(IDI_APP_ICON))));
+        ApplyWindowTheme(dialog, state->dark);
         CenterDialog(dialog);
         return TRUE;
     }
     if (!state) return FALSE;
+    if (message == WM_CTLCOLORDLG || message == WM_CTLCOLORSTATIC || message == WM_CTLCOLORBTN ||
+        message == WM_CTLCOLOREDIT || message == WM_CTLCOLORLISTBOX) {
+        return ThemeControlColor(state->dark, message, wParam, lParam, false, state->protectionState);
+    }
+    if (message == WM_DRAWITEM && DrawThemedButton(state->dark, reinterpret_cast<DRAWITEMSTRUCT*>(lParam))) return TRUE;
     if (message == WM_COMMAND) {
         const WORD command = LOWORD(wParam);
         if (command == IDCANCEL) {
@@ -436,6 +613,8 @@ public:
     TrayApp(HINSTANCE instance, fs::path settingsPath, bool openSettingsOnStart, bool openStatusOnStart, bool manualUpdateCheckOnStart)
         : instance_(instance), settingsPath_(std::move(settingsPath)), options_(il2mec::LoadAutoSaveOptions(settingsPath_)),
           store_(il2mec::DefaultSnapshotRoot(), options_.historicSnapshots) {
+        effectiveDark_ = UsesDarkTheme(options_.theme);
+        ConfigureProcessTheme(effectiveDark_);
         WNDCLASSEXW windowClass{sizeof(windowClass)};
         windowClass.lpfnWndProc = WindowProcedure;
         windowClass.hInstance = instance_;
@@ -445,7 +624,7 @@ public:
         window_ = CreateWindowExW(0, kWindowClass, L"IL-2 Mission Guard", 0, 0, 0, 0, 0,
                                   HWND_MESSAGE, nullptr, instance_, this);
         if (!window_) throw std::runtime_error("Could not create the autosave notification window.");
-        statusDialogState_ = {window_, instance_};
+        statusDialogState_ = {window_, instance_, effectiveDark_, ProtectionState::Idle};
         stopEvent_.reset(OpenEventW(SYNCHRONIZE, FALSE, kStopEventName));
         if (!stopEvent_) stopEvent_.reset(CreateEventW(nullptr, FALSE, FALSE, kStopEventName));
         taskbarCreated_ = RegisterWindowMessageW(L"TaskbarCreated");
@@ -484,6 +663,7 @@ private:
     HWND window_{};
     fs::path settingsPath_;
     il2mec::AutoSaveOptions options_;
+    bool effectiveDark_ = false;
     il2mec::SnapshotStore store_;
     UniqueHandle stopEvent_;
     UINT taskbarCreated_{};
@@ -670,6 +850,7 @@ private:
 
     void UpdateStatus() {
         const ProtectionState state = CurrentProtectionState();
+        statusDialogState_.protectionState = state;
         SetProtectionState(state);
         if (!statusDialog_) return;
         std::wstring stateText;
@@ -698,6 +879,7 @@ private:
         SetDlgItemTextW(statusDialog_, IDC_STATUS_COUNT, std::to_wstring(snapshotCount_).c_str());
         SetDlgItemTextW(statusDialog_, IDC_STATUS_ISSUE, (lastIssue_.empty() ? L"None" : lastIssue_).c_str());
         SetDlgItemTextW(statusDialog_, IDC_STATUS_VERSION, (L"v" + std::wstring(il2mec::kCurrentVersion)).c_str());
+        InvalidateRect(GetDlgItem(statusDialog_, IDC_STATUS_STATE), nullptr, TRUE);
     }
 
     void ShowStatus() {
@@ -725,7 +907,15 @@ private:
         bool scheduleChanged = loaded.enabled != options_.enabled || loaded.intervalMinutes != options_.intervalMinutes ||
                                loaded.greatBattles != options_.greatBattles || loaded.korea != options_.korea;
         bool retentionChanged = loaded.historicSnapshots != options_.historicSnapshots;
+        const bool newDark = UsesDarkTheme(loaded.theme);
+        const bool themeChanged = newDark != effectiveDark_ || loaded.theme != options_.theme;
         options_ = loaded;
+        if (themeChanged) {
+            effectiveDark_ = newDark;
+            statusDialogState_.dark = effectiveDark_;
+            ConfigureProcessTheme(effectiveDark_);
+            if (statusDialog_) ApplyWindowTheme(statusDialog_, effectiveDark_);
+        }
         if (scheduleChanged) nextSave_.clear();
         if (retentionChanged) {
             store_ = il2mec::SnapshotStore(il2mec::DefaultSnapshotRoot(), options_.historicSnapshots);
@@ -851,6 +1041,7 @@ private:
     }
 
     void ShowMenu() {
+        ConfigureProcessTheme(effectiveDark_);
         restoreItems_.clear();
         auto active = ActiveMissionPaths();
         if (active.empty()) restoreItems_ = store_.ListSnapshots(std::nullopt, options_.historicSnapshots);
@@ -906,7 +1097,7 @@ private:
     }
 
     void ShowSettings() {
-        SettingsDialogState state{options_, settingsPath_, instance_, false};
+        SettingsDialogState state{options_, settingsPath_, instance_, effectiveDark_, false};
         const INT_PTR result = DialogBoxParamW(
             instance_, MAKEINTRESOURCEW(IDD_SETTINGS), nullptr,
             SettingsDialogProcedure, reinterpret_cast<LPARAM>(&state));
