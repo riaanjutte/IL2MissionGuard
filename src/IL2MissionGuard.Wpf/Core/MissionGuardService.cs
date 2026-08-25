@@ -121,6 +121,26 @@ internal sealed class MissionGuardService : IDisposable
             .ToList();
     }
 
+    public int GetSnapshotCount() => store.CountSnapshots();
+
+    public async Task<int> DeleteAllSnapshotsAsync(CancellationToken cancellationToken = default)
+    {
+        await operationLock.WaitAsync(cancellationToken);
+        try
+        {
+            int deleted = store.DeleteAllSnapshots();
+            lastSuccess = null;
+            lastSuccessMission = string.Empty;
+            RefreshSnapshotSummary();
+            return deleted;
+        }
+        finally
+        {
+            operationLock.Release();
+            RaiseStatusChanged();
+        }
+    }
+
     public async Task<IReadOnlyList<SaveAttemptResult>> CreateRecoveryPointNowAsync(CancellationToken cancellationToken = default)
     {
         editors = EditorInterop.FindEditors(options);

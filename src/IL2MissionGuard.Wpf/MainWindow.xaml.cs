@@ -150,6 +150,7 @@ public partial class MainWindow : FluentWindow
     private void RefreshRecoveryRows()
     {
         RecoveryGrid.ItemsSource = service.GetSnapshots().Select(snapshot => new RecoveryRow(snapshot)).ToList();
+        DeleteSnapshotsButton.IsEnabled = service.GetSnapshotCount() > 0;
     }
 
     private void ShowPage(FrameworkElement page)
@@ -202,6 +203,46 @@ public partial class MainWindow : FluentWindow
     private void RefreshRecovery_Click(object sender, RoutedEventArgs eventArgs) => RefreshRecoveryRows();
 
     private void OpenSnapshots_Click(object sender, RoutedEventArgs eventArgs) => OpenPath(SettingsStore.DefaultSnapshotRoot, true);
+
+    private async void DeleteSnapshots_Click(object sender, RoutedEventArgs eventArgs)
+    {
+        int count = service.GetSnapshotCount();
+        if (count == 0)
+        {
+            RefreshRecoveryRows();
+            return;
+        }
+
+        Wpf.Ui.Controls.MessageBoxResult answer = await ShowMessageAsync(
+            "Delete all snapshots?",
+            $"Permanently delete all {count:N0} recovery point{(count == 1 ? string.Empty : "s")}?{Environment.NewLine}{Environment.NewLine}" +
+            $"This also removes restore safety copies stored in:{Environment.NewLine}{SettingsStore.DefaultSnapshotRoot}{Environment.NewLine}{Environment.NewLine}" +
+            "This action cannot be undone.",
+            "Delete all snapshots",
+            "Cancel",
+            ControlAppearance.Danger);
+        if (answer != Wpf.Ui.Controls.MessageBoxResult.Primary)
+        {
+            return;
+        }
+
+        try
+        {
+            IsEnabled = false;
+            _ = await service.DeleteAllSnapshotsAsync();
+            RefreshRecoveryRows();
+            UpdateStatus();
+        }
+        catch (Exception error) when (error is IOException or UnauthorizedAccessException or InvalidOperationException)
+        {
+            AppLog.Write("Snapshot deletion failed: " + error.Message);
+            await ShowMessageAsync("Snapshots could not be deleted", error.Message);
+        }
+        finally
+        {
+            IsEnabled = true;
+        }
+    }
 
     private async void Restore_Click(object sender, RoutedEventArgs eventArgs)
     {
@@ -357,7 +398,12 @@ public partial class MainWindow : FluentWindow
         }
     }
 
-    private Task<Wpf.Ui.Controls.MessageBoxResult> ShowMessageAsync(string title, string message, string primary = "OK", string? secondary = null)
+    private Task<Wpf.Ui.Controls.MessageBoxResult> ShowMessageAsync(
+        string title,
+        string message,
+        string primary = "OK",
+        string? secondary = null,
+        ControlAppearance primaryAppearance = ControlAppearance.Primary)
     {
         MessageBox box = new()
         {
@@ -365,6 +411,7 @@ public partial class MainWindow : FluentWindow
             Content = message,
             PrimaryButtonText = secondary is null ? string.Empty : primary,
             CloseButtonText = secondary ?? primary,
+            PrimaryButtonAppearance = primaryAppearance,
             Owner = this,
             WindowStartupLocation = WindowStartupLocation.CenterOwner,
         };

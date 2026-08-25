@@ -176,6 +176,19 @@ internal sealed class SnapshotStore
         ? Directory.EnumerateFiles(RootDirectory, "*" + MetadataSuffix, SearchOption.AllDirectories).Count()
         : 0;
 
+    public int DeleteAllSnapshots()
+    {
+        int count = CountSnapshots();
+        if (!Directory.Exists(RootDirectory))
+        {
+            return count;
+        }
+
+        Directory.Delete(RootDirectory, true);
+        Directory.CreateDirectory(RootDirectory);
+        return count;
+    }
+
     public void PruneToRetentionLimit()
     {
         if (!Directory.Exists(RootDirectory))
