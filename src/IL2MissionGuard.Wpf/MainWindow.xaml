@@ -81,7 +81,7 @@
 
                 <StackPanel Grid.Row="3">
                     <TextBlock Text="RUNNING IN THE TRAY" FontSize="10" FontWeight="Bold" Opacity="0.55" />
-                    <TextBlock Text="You can close this window. Mission Guard remains active while an editor is open." TextWrapping="Wrap" FontSize="12" Opacity="0.72" Margin="0,6,0,12" />
+                    <TextBlock Text="You can close this window. The tiny-footprint tray host remains active while an editor is open." TextWrapping="Wrap" FontSize="12" Opacity="0.72" Margin="0,6,0,12" />
                     <TextBlock x:Name="VersionText" FontSize="11" Opacity="0.5" />
                 </StackPanel>
             </Grid>

@@ -16,7 +16,7 @@ It asks the editor to run its normal **File > Save** command at a configurable i
 - Creates a separate safety backup before replacing current mission files.
 - Closes and reopens the matching editor when restoring a mission.
 - Imports legacy recovery points without deleting the old copies.
-- Keeps editor monitoring, autosave, recovery history, updates, and the tray icon in a lightweight native host.
+- Keeps editor monitoring, autosave, recovery history, updates, and the tray icon in a tiny-footprint native host.
 - Opens the modern .NET 10/WPF dashboard only on demand and closes that UI process when its window is closed.
 - Includes a structured recovery library, compact settings page, and themed update experience using WPF UI controls.
 - Uses the branded Mission Guard shield in the Windows notification area.
