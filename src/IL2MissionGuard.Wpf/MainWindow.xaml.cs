@@ -12,6 +12,7 @@ namespace IL2MissionGuard;
 public partial class MainWindow : FluentWindow
 {
     private readonly MissionGuardService service;
+    private List<RecoveryRow> listedRecoveryRows = [];
     private GitHubRelease? availableRelease;
 
     internal MainWindow(MissionGuardService service)
@@ -149,8 +150,11 @@ public partial class MainWindow : FluentWindow
 
     private void RefreshRecoveryRows()
     {
-        RecoveryGrid.ItemsSource = service.GetSnapshots().Select(snapshot => new RecoveryRow(snapshot)).ToList();
-        DeleteSnapshotsButton.IsEnabled = service.GetSnapshotCount() > 0;
+        listedRecoveryRows = service.GetSnapshots(ViewAllSnapshotsToggle.IsChecked == true)
+            .Select(snapshot => new RecoveryRow(snapshot))
+            .ToList();
+        RecoveryGrid.ItemsSource = listedRecoveryRows;
+        DeleteSnapshotsButton.IsEnabled = listedRecoveryRows.Count > 0;
     }
 
     private void ShowPage(FrameworkElement page)
@@ -202,11 +206,20 @@ public partial class MainWindow : FluentWindow
 
     private void RefreshRecovery_Click(object sender, RoutedEventArgs eventArgs) => RefreshRecoveryRows();
 
+    private void ViewAllSnapshots_Changed(object sender, RoutedEventArgs eventArgs)
+    {
+        if (IsInitialized)
+        {
+            RefreshRecoveryRows();
+        }
+    }
+
     private void OpenSnapshots_Click(object sender, RoutedEventArgs eventArgs) => OpenPath(SettingsStore.DefaultSnapshotRoot, true);
 
     private async void DeleteSnapshots_Click(object sender, RoutedEventArgs eventArgs)
     {
-        int count = service.GetSnapshotCount();
+        List<Snapshot> snapshots = listedRecoveryRows.Select(row => row.Snapshot).ToList();
+        int count = snapshots.Count;
         if (count == 0)
         {
             RefreshRecoveryRows();
@@ -214,11 +227,11 @@ public partial class MainWindow : FluentWindow
         }
 
         Wpf.Ui.Controls.MessageBoxResult answer = await ShowMessageAsync(
-            "Delete all snapshots?",
-            $"Permanently delete all {count:N0} recovery point{(count == 1 ? string.Empty : "s")}?{Environment.NewLine}{Environment.NewLine}" +
-            $"This also removes restore safety copies stored in:{Environment.NewLine}{SettingsStore.DefaultSnapshotRoot}{Environment.NewLine}{Environment.NewLine}" +
+            "Delete listed snapshots?",
+            $"Permanently delete the {count:N0} recovery point{(count == 1 ? string.Empty : "s")} currently listed?{Environment.NewLine}{Environment.NewLine}" +
+            "Snapshots hidden by the current filter and restore safety copies will not be deleted." + Environment.NewLine + Environment.NewLine +
             "This action cannot be undone.",
-            "Delete all snapshots",
+            "Delete listed snapshots",
             "Cancel",
             ControlAppearance.Danger);
         if (answer != Wpf.Ui.Controls.MessageBoxResult.Primary)
@@ -229,7 +242,7 @@ public partial class MainWindow : FluentWindow
         try
         {
             IsEnabled = false;
-            _ = await service.DeleteAllSnapshotsAsync();
+            _ = await service.DeleteSnapshotsAsync(snapshots);
             RefreshRecoveryRows();
             UpdateStatus();
         }

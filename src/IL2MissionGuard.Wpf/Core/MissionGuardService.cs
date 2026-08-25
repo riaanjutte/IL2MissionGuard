@@ -104,31 +104,41 @@ internal sealed class MissionGuardService : IDisposable
         Tick();
     }
 
-    public List<Snapshot> GetSnapshots(int maximum = 200)
+    public List<Snapshot> GetSnapshots(bool includeAll = false, int maximum = int.MaxValue)
     {
-        List<string> active = editors
-            .Select(editor => EditorInterop.TryGetSavedMissionPath(editor.Title, out string path) ? path : null)
-            .OfType<string>()
-            .ToList();
-        if (active.Count == 0)
+        editors = EditorInterop.FindEditors(options);
+        if (includeAll)
         {
             return store.ListSnapshots(null, maximum);
         }
 
-        return active.SelectMany(path => store.ListSnapshots(path, options.HistoricSnapshots))
+        List<(string MissionPath, string EditorName)> active = [];
+        foreach (EditorProcess editor in editors)
+        {
+            if (EditorInterop.TryGetSavedMissionPath(editor.Title, out string path))
+            {
+                active.Add((path, editor.Name));
+            }
+        }
+        if (active.Count == 0)
+        {
+            return [];
+        }
+
+        return active.SelectMany(item => store.ListSnapshots(item.MissionPath, int.MaxValue)
+                .Where(snapshot => snapshot.EditorProcessName.Equals(item.EditorName, StringComparison.OrdinalIgnoreCase)))
+            .DistinctBy(snapshot => snapshot.MetadataPath, StringComparer.OrdinalIgnoreCase)
             .OrderByDescending(snapshot => snapshot.CreatedUtc)
             .Take(maximum)
             .ToList();
     }
 
-    public int GetSnapshotCount() => store.CountSnapshots();
-
-    public async Task<int> DeleteAllSnapshotsAsync(CancellationToken cancellationToken = default)
+    public async Task<int> DeleteSnapshotsAsync(IReadOnlyCollection<Snapshot> snapshots, CancellationToken cancellationToken = default)
     {
         await operationLock.WaitAsync(cancellationToken);
         try
         {
-            int deleted = store.DeleteAllSnapshots();
+            int deleted = store.DeleteSnapshots(snapshots);
             lastSuccess = null;
             lastSuccessMission = string.Empty;
             RefreshSnapshotSummary();

@@ -144,10 +144,17 @@
 
             <Grid x:Name="RecoveryPage" Visibility="Collapsed">
                 <Grid.RowDefinitions><RowDefinition Height="Auto" /><RowDefinition Height="18" /><RowDefinition Height="*" /><RowDefinition Height="16" /><RowDefinition Height="Auto" /></Grid.RowDefinitions>
-                <StackPanel>
-                    <TextBlock Text="Recovery points" Style="{StaticResource SectionTitleStyle}" />
-                    <TextBlock Text="Browse verified snapshots for the active mission, or all missions when no editor is open." Opacity="0.68" Margin="0,6,0,0" />
-                </StackPanel>
+                <Grid>
+                    <Grid.ColumnDefinitions><ColumnDefinition /><ColumnDefinition Width="Auto" /></Grid.ColumnDefinitions>
+                    <StackPanel Margin="0,0,18,0">
+                        <TextBlock Text="Recovery points" Style="{StaticResource SectionTitleStyle}" />
+                        <TextBlock Text="Showing recovery points for the missions currently open in the detected editors."
+                                   TextWrapping="Wrap" Opacity="0.68" Margin="0,6,0,0" />
+                    </StackPanel>
+                    <ui:ToggleSwitch x:Name="ViewAllSnapshotsToggle" Grid.Column="1" HorizontalAlignment="Right" VerticalAlignment="Center"
+                                     Content="View all snapshots" IsChecked="False"
+                                     Checked="ViewAllSnapshots_Changed" Unchecked="ViewAllSnapshots_Changed" />
+                </Grid>
                 <ui:Card Grid.Row="2" Padding="0">
                     <DataGrid x:Name="RecoveryGrid" AutoGenerateColumns="False" IsReadOnly="True" SelectionMode="Single"
                               HeadersVisibility="Column" GridLinesVisibility="None" BorderThickness="0" RowHeight="42"
@@ -165,7 +172,7 @@
                     <StackPanel Orientation="Horizontal">
                         <ui:Button Content="Refresh" Icon="{ui:SymbolIcon ArrowClockwise24}" Click="RefreshRecovery_Click" />
                         <ui:Button Content="Open snapshot folder" Margin="10,0,0,0" Icon="{ui:SymbolIcon FolderOpen24}" Click="OpenSnapshots_Click" />
-                        <ui:Button x:Name="DeleteSnapshotsButton" Content="Delete all snapshots" Margin="10,0,0,0"
+                        <ui:Button x:Name="DeleteSnapshotsButton" Content="Delete listed snapshots" Margin="10,0,0,0"
                                    Appearance="Danger" Icon="{ui:SymbolIcon Delete24}" Click="DeleteSnapshots_Click" />
                     </StackPanel>
                     <ui:Button HorizontalAlignment="Right" Appearance="Primary" Content="Restore selected point" Icon="{ui:SymbolIcon History24}" Click="Restore_Click" />

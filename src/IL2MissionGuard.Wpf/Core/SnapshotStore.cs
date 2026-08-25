@@ -176,17 +176,38 @@ internal sealed class SnapshotStore
         ? Directory.EnumerateFiles(RootDirectory, "*" + MetadataSuffix, SearchOption.AllDirectories).Count()
         : 0;
 
-    public int DeleteAllSnapshots()
+    public int DeleteSnapshots(IEnumerable<Snapshot> snapshots)
     {
-        int count = CountSnapshots();
-        if (!Directory.Exists(RootDirectory))
+        int deleted = 0;
+        HashSet<string> metadataPaths = new(StringComparer.OrdinalIgnoreCase);
+        foreach (Snapshot snapshot in snapshots)
         {
-            return count;
+            ValidateSnapshot(snapshot);
+            string metadata = Path.GetFullPath(snapshot.MetadataPath);
+            EnsureInside(RootDirectory, metadata, "Snapshot is outside the recovery folder.");
+            if (!metadataPaths.Add(metadata) || !File.Exists(metadata))
+            {
+                continue;
+            }
+
+            string directory = Path.GetDirectoryName(metadata)!;
+            foreach (SnapshotFile file in snapshot.Files)
+            {
+                File.Delete(ResolveChildPath(directory, file.SnapshotFileName));
+            }
+
+            File.Delete(metadata);
+            deleted++;
+            if (!PathEquals(directory, RootDirectory) &&
+                Directory.Exists(directory) &&
+                !Directory.EnumerateFileSystemEntries(directory).Any())
+            {
+                Directory.Delete(directory);
+            }
         }
 
-        Directory.Delete(RootDirectory, true);
         Directory.CreateDirectory(RootDirectory);
-        return count;
+        return deleted;
     }
 
     public void PruneToRetentionLimit()

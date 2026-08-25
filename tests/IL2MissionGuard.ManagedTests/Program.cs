@@ -123,9 +123,11 @@ static async Task TestSnapshotsAsync(string root)
 
     Require(rejected, "damaged restore rejected");
 
-    int deleted = store.DeleteAllSnapshots();
-    Require(deleted == 2, "delete all reports snapshot count");
-    Require(store.CountSnapshots() == 0 && Directory.Exists(store.RootDirectory), "delete all clears and recreates snapshot root");
+    int deleted = store.DeleteSnapshots([damaged]);
+    Require(deleted == 1 && store.CountSnapshots() == 1, "delete listed removes only supplied snapshot");
+    deleted = store.DeleteSnapshots([second, second]);
+    Require(deleted == 1, "delete listed ignores duplicate input");
+    Require(store.CountSnapshots() == 0 && Directory.Exists(store.RootDirectory), "delete listed preserves snapshot root");
 }
 
 static void TestLegacyImport(string root)
