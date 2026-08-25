@@ -172,13 +172,20 @@
                     </DataGrid>
                 </ui:Card>
                 <Grid Grid.Row="4">
-                    <StackPanel Orientation="Horizontal">
+                    <Grid.RowDefinitions>
+                        <RowDefinition Height="Auto" />
+                        <RowDefinition Height="8" />
+                        <RowDefinition Height="Auto" />
+                    </Grid.RowDefinitions>
+                    <StackPanel Grid.Row="0" Orientation="Horizontal">
                         <ui:Button Content="Refresh" Icon="{ui:SymbolIcon ArrowClockwise24}" Click="RefreshRecovery_Click" />
                         <ui:Button Content="Open snapshot folder" Margin="10,0,0,0" Icon="{ui:SymbolIcon FolderOpen24}" Click="OpenSnapshots_Click" />
-                        <ui:Button x:Name="DeleteSnapshotsButton" Content="Delete listed snapshots" Margin="10,0,0,0"
-                                   Appearance="Danger" Icon="{ui:SymbolIcon Delete24}" Click="DeleteSnapshots_Click" />
                     </StackPanel>
-                    <ui:Button HorizontalAlignment="Right" Appearance="Primary" Content="Restore selected point" Icon="{ui:SymbolIcon History24}" Click="Restore_Click" />
+                    <ui:Button Grid.Row="0" HorizontalAlignment="Right" Appearance="Primary"
+                               Content="Restore selected point" Icon="{ui:SymbolIcon History24}" Click="Restore_Click" />
+                    <ui:Button x:Name="DeleteSnapshotsButton" Grid.Row="2" HorizontalAlignment="Left"
+                               Content="Delete listed snapshots" Appearance="Danger"
+                               Icon="{ui:SymbolIcon Delete24}" Click="DeleteSnapshots_Click" />
                 </Grid>
             </Grid>
 
