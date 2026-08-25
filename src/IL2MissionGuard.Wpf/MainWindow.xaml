@@ -146,12 +146,13 @@
                 <Grid.RowDefinitions><RowDefinition Height="Auto" /><RowDefinition Height="18" /><RowDefinition Height="*" /><RowDefinition Height="16" /><RowDefinition Height="Auto" /></Grid.RowDefinitions>
                 <Grid>
                     <Grid.ColumnDefinitions><ColumnDefinition /><ColumnDefinition Width="Auto" /></Grid.ColumnDefinitions>
-                    <StackPanel Margin="0,0,18,0">
-                        <TextBlock Text="Recovery points" Style="{StaticResource SectionTitleStyle}" />
-                        <TextBlock Text="Showing recovery points for the missions currently open in the detected editors."
-                                   TextWrapping="Wrap" Opacity="0.68" Margin="0,6,0,0" />
-                    </StackPanel>
-                    <ui:ToggleSwitch x:Name="ViewAllSnapshotsToggle" Grid.Column="1" HorizontalAlignment="Right" VerticalAlignment="Center"
+                    <Grid.RowDefinitions><RowDefinition Height="Auto" /><RowDefinition Height="Auto" /></Grid.RowDefinitions>
+                    <TextBlock Grid.Row="0" Grid.ColumnSpan="2" Text="Recovery points" Style="{StaticResource SectionTitleStyle}" />
+                    <TextBlock Grid.Row="1" Margin="0,6,18,0"
+                               Text="Showing recovery points for the missions currently open in the detected editors."
+                               TextWrapping="Wrap" Opacity="0.68" />
+                    <ui:ToggleSwitch x:Name="ViewAllSnapshotsToggle" Grid.Row="1" Grid.Column="1"
+                                     HorizontalAlignment="Right" VerticalAlignment="Center" Margin="0,6,0,0"
                                      Content="View all snapshots" IsChecked="False"
                                      Checked="ViewAllSnapshots_Changed" Unchecked="ViewAllSnapshots_Changed" />
                 </Grid>

@@ -13,6 +13,8 @@ public partial class MainWindow : FluentWindow
 {
     private readonly MissionGuardService service;
     private List<RecoveryRow> listedRecoveryRows = [];
+    private int observedSnapshotCount = -1;
+    private DateTimeOffset? observedNewestSnapshot;
     private GitHubRelease? availableRelease;
 
     internal MainWindow(MissionGuardService service)
@@ -97,7 +99,16 @@ public partial class MainWindow : FluentWindow
         Focus();
     }
 
-    private void Service_StatusChanged(object? sender, EventArgs eventArgs) => UpdateStatus();
+    private void Service_StatusChanged(object? sender, EventArgs eventArgs)
+    {
+        UpdateStatus();
+        GuardStatus status = service.Status;
+        if (RecoveryPage.Visibility == Visibility.Visible &&
+            (status.SnapshotCount != observedSnapshotCount || status.LastSuccess != observedNewestSnapshot))
+        {
+            RefreshRecoveryRows();
+        }
+    }
 
     private void UpdateStatus()
     {
@@ -156,6 +167,9 @@ public partial class MainWindow : FluentWindow
         RecoveryGrid.ItemsSource = listedRecoveryRows;
         DeleteSnapshotsButton.IsEnabled = listedRecoveryRows.Count > 0;
         RestoreSnapshotButton.IsEnabled = listedRecoveryRows.Count > 0;
+        GuardStatus status = service.Status;
+        observedSnapshotCount = status.SnapshotCount;
+        observedNewestSnapshot = status.LastSuccess;
     }
 
     private void ShowPage(FrameworkElement page)
